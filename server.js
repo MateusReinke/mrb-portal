@@ -5,8 +5,9 @@ const multer = require("multer");
 
 const app = express();
 
-// ✅ PORTA 8088
-const PORT = Number(process.env.PORT || 8088);
+// ✅ Coolify normalmente seta PORT automaticamente.
+// ✅ Mantemos fallback 8088 só se PORT não existir.
+const PORT = Number(process.env.PORT ?? 8088);
 
 // 🔐 senha admin (defina no Coolify)
 const ADMIN_PASSWORD = String(process.env.ADMIN_PASSWORD || "1537");
@@ -102,13 +103,11 @@ const upload = multer({
 app.get("/api/health", (req, res) => res.json({ ok: true }));
 app.get("/api/cards", (req, res) => res.json(readCards()));
 
-// ✅ upload protegido
 app.post("/api/upload", requireAuth, upload.single("file"), (req, res) => {
   if (!req.file) return res.status(400).json({ error: "Arquivo não enviado." });
   res.json({ url: `/uploads/${req.file.filename}` });
 });
 
-// ✅ criar
 app.post("/api/cards", requireAuth, (req, res) => {
   try {
     const cards = readCards();
@@ -132,7 +131,6 @@ app.post("/api/cards", requireAuth, (req, res) => {
   }
 });
 
-// ✅ editar
 app.put("/api/cards/:id", requireAuth, (req, res) => {
   try {
     const cards = readCards();
@@ -153,7 +151,6 @@ app.put("/api/cards/:id", requireAuth, (req, res) => {
   }
 });
 
-// ✅ excluir
 app.delete("/api/cards/:id", requireAuth, (req, res) => {
   const cards = readCards();
   const id = Number(req.params.id);
@@ -171,5 +168,7 @@ app.get("*", (req, res) => {
 });
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`✅ MRB Portal em http://0.0.0.0:${PORT}`);
+  console.log("✅ MRB Portal iniciado");
+  console.log("ENV PORT =", process.env.PORT);
+  console.log("LISTENING PORT =", PORT);
 });
