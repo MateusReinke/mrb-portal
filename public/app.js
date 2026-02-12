@@ -36,7 +36,6 @@ function escapeHtml(str) {
     .replaceAll("'", "&#039;");
 }
 
-// preview
 function setPreviewFromUrl(url) {
   const clean = String(url || "").trim();
   if (!clean) {
@@ -192,7 +191,6 @@ function applyFilter() {
   });
   render(filtered);
 }
-
 searchEl.addEventListener("input", applyFilter);
 
 // grid click
@@ -244,14 +242,17 @@ async function uploadSelectedImageIfAny(password) {
   if (!file) return null;
 
   const fd = new FormData();
-  fd.append("file", file);
-  fd.append("admin_password", password);
 
+  // ✅ IMPORTANTE: garantir que este campo exista no FormData
+  fd.append("admin_password", String(password || "").trim());
+  fd.append("file", file);
+
+  // ✅ não setar Content-Type manualmente (o browser seta boundary)
   const result = await api("/api/upload", { method: "POST", body: fd });
   return result.url;
 }
 
-// save (senha sempre, cada vez)
+// save
 cardForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   try {
@@ -272,7 +273,7 @@ cardForm.addEventListener("submit", async (e) => {
     }
 
     const payload = {
-      admin_password: conf.pass, // ✅ vai no body
+      admin_password: conf.pass,
       title: cardForm.elements.title.value,
       category: cardForm.elements.category.value,
       url: cardForm.elements.url.value,
@@ -302,7 +303,7 @@ cardForm.addEventListener("submit", async (e) => {
   }
 });
 
-// delete (senha sempre)
+// delete
 deleteBtn.addEventListener("click", async () => {
   try {
     const id = currentId || cardForm.elements.id.value;
@@ -319,7 +320,7 @@ deleteBtn.addEventListener("click", async () => {
     await api(`/api/cards/${encodeURIComponent(id)}`, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ admin_password: conf.pass }), // ✅ body
+      body: JSON.stringify({ admin_password: conf.pass }),
     });
 
     closeCardModal();

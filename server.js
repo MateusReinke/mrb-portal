@@ -4,11 +4,8 @@ const fs = require("fs");
 const multer = require("multer");
 
 const app = express();
-
-// Porta
 const PORT = Number(process.env.PORT ?? 8088);
 
-// Normaliza secrets (tira aspas/espaços/newlines)
 function normalizeSecret(value, fallback) {
   let v = (value ?? fallback ?? "").toString().trim();
   if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
@@ -18,10 +15,8 @@ function normalizeSecret(value, fallback) {
   return v;
 }
 
-// Senha admin
 const ADMIN_PASSWORD = normalizeSecret(process.env.ADMIN_PASSWORD, "1537");
 
-// Estrutura
 const DATA_FILE = path.join(__dirname, "data", "data.json");
 const PUBLIC_DIR = path.join(__dirname, "public");
 const UPLOAD_DIR = path.join(PUBLIC_DIR, "uploads");
@@ -78,8 +73,6 @@ function getPasswordFromHeaders(req) {
 }
 
 function getPasswordFromBody(req) {
-  // JSON: { admin_password: "..." }
-  // multipart: FormData admin_password
   const p = req?.body?.admin_password ?? req?.body?.password ?? "";
   return normalizeSecret(p, "");
 }
@@ -101,6 +94,8 @@ function requireAuth(req, res, next) {
         env_has_admin_password: !!process.env.ADMIN_PASSWORD,
         provided_from_header: !!getPasswordFromHeaders(req),
         provided_from_body: !!getPasswordFromBody(req),
+        body_keys: req.body ? Object.keys(req.body) : [],
+        content_type: String(req.headers["content-type"] || ""),
       },
     });
   }
@@ -131,9 +126,8 @@ const upload = multer({
 app.get("/api/health", (req, res) => res.json({ ok: true }));
 app.get("/api/cards", (req, res) => res.json(readCards()));
 
-// ✅ upload protegido (senha pode vir no FormData)
-app.post("/api/upload", upload.single("file"), (req, res, next) => {
-  // primeiro multer parseia req.body e req.file, depois validamos senha
+// ✅ Upload: multer primeiro (pra preencher req.body), depois auth com debug
+app.post("/api/upload", upload.single("file"), (req, res) => {
   if (!isAuthorized(req)) {
     return res.status(401).json({
       error: "Senha inválida ou não informada.",
@@ -141,16 +135,18 @@ app.post("/api/upload", upload.single("file"), (req, res, next) => {
         env_has_admin_password: !!process.env.ADMIN_PASSWORD,
         provided_from_header: !!getPasswordFromHeaders(req),
         provided_from_body: !!getPasswordFromBody(req),
+        body_keys: req.body ? Object.keys(req.body) : [],
+        has_file: !!req.file,
+        content_type: String(req.headers["content-type"] || ""),
       },
     });
   }
-  next();
-}, (req, res) => {
+
   if (!req.file) return res.status(400).json({ error: "Arquivo não enviado." });
-  res.json({ url: `/uploads/${req.file.filename}` });
+  return res.json({ url: `/uploads/${req.file.filename}` });
 });
 
-// ✅ criar (senha via JSON body)
+// ✅ criar/editar/excluir via JSON body (admin_password no body)
 app.post("/api/cards", requireAuth, (req, res) => {
   try {
     const cards = readCards();
@@ -174,7 +170,6 @@ app.post("/api/cards", requireAuth, (req, res) => {
   }
 });
 
-// ✅ editar
 app.put("/api/cards/:id", requireAuth, (req, res) => {
   try {
     const cards = readCards();
@@ -195,7 +190,6 @@ app.put("/api/cards/:id", requireAuth, (req, res) => {
   }
 });
 
-// ✅ excluir
 app.delete("/api/cards/:id", requireAuth, (req, res) => {
   const cards = readCards();
   const id = Number(req.params.id);

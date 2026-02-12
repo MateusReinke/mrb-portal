@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Portal MRB Automações</title>
-  <link rel="stylesheet" href="/style.css?v=modern1" />
+  <link rel="stylesheet" href="/style.css?v=modern2" />
 </head>
 <body>
   <main class="page">
@@ -24,7 +24,7 @@
     </section>
   </main>
 
-  <!-- Modal (criar/editar) -->
+  <!-- Modal Card -->
   <div id="card-modal" class="modal" aria-hidden="true">
     <div class="modal__backdrop" data-close="1"></div>
 
@@ -37,7 +37,6 @@
       <form id="card-form" class="modal__form">
         <input type="hidden" name="id" />
 
-        <!-- Preview + upload -->
         <section class="imageBox">
           <div class="imageBox__preview">
             <img id="imgPreview" alt="" />
@@ -55,9 +54,7 @@
               <input id="imageFile" type="file" accept="image/*" />
             </label>
 
-            <p class="hint mini">
-              Upload usa o servidor e exige senha no momento da confirmação.
-            </p>
+            <p class="hint mini">Upload usa o servidor e exige senha no momento da confirmação.</p>
           </div>
         </section>
 
@@ -91,7 +88,7 @@
     </div>
   </div>
 
-  <!-- ✅ Modal SENHA por ação (NÃO salva em sessão) -->
+  <!-- Modal senha -->
   <div id="confirm-modal" class="modal" aria-hidden="true">
     <div class="modal__backdrop" data-close="1"></div>
 
@@ -119,6 +116,6 @@
     </div>
   </div>
 
-  <script src="/app.js?v=modern1"></script>
+  <script src="/app.js?v=modern2"></script>
 </body>
 </html>
