@@ -2,16 +2,29 @@ const express = require("express");
 const path = require("path");
 const fs = require("fs");
 const multer = require("multer");
+const crypto = require("crypto");
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 8088);
 
+// normaliza secret removendo: aspas, espaços, tabs, newlines e chars invisíveis
 function normalizeSecret(value, fallback) {
-  let v = (value ?? fallback ?? "").toString().trim();
+  let v = (value ?? fallback ?? "").toString();
+
+  // remove BOM e zero-width chars comuns
+  v = v.replace(/\uFEFF/g, "");                 // BOM
+  v = v.replace(/[\u200B-\u200D\u2060]/g, "");  // zero width
+
+  v = v.trim();
+
+  // remove aspas envolvendo o valor
   if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
-    v = v.slice(1, -1).trim();
+    v = v.slice(1, -1);
   }
-  v = v.replace(/\r?\n/g, "").trim();
+
+  // remove todos espaços/tabs/newlines restantes (se você quiser permitir espaço na senha, remova esta linha)
+  v = v.replace(/\s+/g, "");
+
   return v;
 }
 
@@ -64,11 +77,15 @@ function normalizeCard(input) {
   return { title, category, url, image, description };
 }
 
-// ---------- Auth (HEADER ou BODY) ----------
+// ---------- Auth helpers ----------
+function sha8(s) {
+  return crypto.createHash("sha256").update(String(s || ""), "utf8").digest("hex").slice(0, 10);
+}
+
 function getPasswordFromHeaders(req) {
-  const headerPass = String(req.headers["x-admin-password"] || "").trim();
-  const auth = String(req.headers["authorization"] || "").trim();
-  const bearer = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+  const headerPass = String(req.headers["x-admin-password"] || "");
+  const auth = String(req.headers["authorization"] || "");
+  const bearer = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7) : "";
   return normalizeSecret(headerPass || bearer, "");
 }
 
@@ -88,12 +105,20 @@ function isAuthorized(req) {
 
 function requireAuth(req, res, next) {
   if (!isAuthorized(req)) {
+    const provided = getProvidedPassword(req);
+
     return res.status(401).json({
       error: "Senha inválida ou não informada.",
       debug: {
         env_has_admin_password: !!process.env.ADMIN_PASSWORD,
+        env_admin_len: ADMIN_PASSWORD.length,
+        env_admin_hash8: sha8(ADMIN_PASSWORD),
+
         provided_from_header: !!getPasswordFromHeaders(req),
         provided_from_body: !!getPasswordFromBody(req),
+        provided_len: provided.length,
+        provided_hash8: sha8(provided),
+
         body_keys: req.body ? Object.keys(req.body) : [],
         content_type: String(req.headers["content-type"] || ""),
       },
@@ -101,6 +126,19 @@ function requireAuth(req, res, next) {
   }
   next();
 }
+
+// ✅ endpoint pra testar senha e comparar hash (não vaza)
+app.post("/api/debug-auth-hash", (req, res) => {
+  const provided = getProvidedPassword(req);
+  return res.json({
+    ok: provided === ADMIN_PASSWORD,
+    env_has_admin_password: !!process.env.ADMIN_PASSWORD,
+    env_admin_len: ADMIN_PASSWORD.length,
+    env_admin_hash8: sha8(ADMIN_PASSWORD),
+    provided_len: provided.length,
+    provided_hash8: sha8(provided),
+  });
+});
 
 // ---------- Upload (multer) ----------
 const storage = multer.diskStorage({
@@ -114,7 +152,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 3 * 1024 * 1024 }, // 3MB
+  limits: { fileSize: 3 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const ok = ["image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml"].includes(file.mimetype);
     if (!ok) return cb(new Error("Tipo inválido. Envie PNG/JPG/GIF/WEBP/SVG."));
@@ -126,15 +164,22 @@ const upload = multer({
 app.get("/api/health", (req, res) => res.json({ ok: true }));
 app.get("/api/cards", (req, res) => res.json(readCards()));
 
-// ✅ Upload: multer primeiro (pra preencher req.body), depois auth com debug
+// upload: multer primeiro, depois auth
 app.post("/api/upload", upload.single("file"), (req, res) => {
   if (!isAuthorized(req)) {
+    const provided = getProvidedPassword(req);
     return res.status(401).json({
       error: "Senha inválida ou não informada.",
       debug: {
         env_has_admin_password: !!process.env.ADMIN_PASSWORD,
+        env_admin_len: ADMIN_PASSWORD.length,
+        env_admin_hash8: sha8(ADMIN_PASSWORD),
+
         provided_from_header: !!getPasswordFromHeaders(req),
         provided_from_body: !!getPasswordFromBody(req),
+        provided_len: provided.length,
+        provided_hash8: sha8(provided),
+
         body_keys: req.body ? Object.keys(req.body) : [],
         has_file: !!req.file,
         content_type: String(req.headers["content-type"] || ""),
@@ -146,7 +191,7 @@ app.post("/api/upload", upload.single("file"), (req, res) => {
   return res.json({ url: `/uploads/${req.file.filename}` });
 });
 
-// ✅ criar/editar/excluir via JSON body (admin_password no body)
+// create/edit/delete
 app.post("/api/cards", requireAuth, (req, res) => {
   try {
     const cards = readCards();
@@ -209,4 +254,6 @@ app.get("*", (req, res) => {
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ MRB Portal em http://0.0.0.0:${PORT}`);
   console.log("ENV ADMIN_PASSWORD exists?", !!process.env.ADMIN_PASSWORD);
+  console.log("ADMIN_PASSWORD len =", ADMIN_PASSWORD.length);
+  console.log("ADMIN_PASSWORD hash8 =", sha8(ADMIN_PASSWORD));
 });
