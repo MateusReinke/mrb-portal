@@ -1,17 +1,22 @@
 const grid = document.querySelector("#cards-grid");
 const statusEl = document.querySelector("#status");
 const searchEl = document.querySelector("#search");
-const adminBtn = document.querySelector("#adminBtn");
 
+// modais
 const cardModal = document.querySelector("#card-modal");
 const cardModalTitle = document.querySelector("#modal-title");
 const cardForm = document.querySelector("#card-form");
 const deleteBtn = document.querySelector("#deleteBtn");
 
-const passModal = document.querySelector("#pass-modal");
-const passForm = document.querySelector("#pass-form");
-const passCancelBtn = document.querySelector("#passCancel");
+// confirmar senha por ação
+const confirmModal = document.querySelector("#confirm-modal");
+const confirmForm = document.querySelector("#confirm-form");
+const confirmTitle = document.querySelector("#confirm-title");
+const confirmText = document.querySelector("#confirm-text");
+const confirmPass = document.querySelector("#confirmPass");
+const confirmCancel = document.querySelector("#confirmCancel");
 
+// imagem
 const imageUrlEl = document.querySelector("#imageUrl");
 const imageFileEl = document.querySelector("#imageFile");
 const imgPreviewEl = document.querySelector("#imgPreview");
@@ -21,8 +26,8 @@ let allCards = [];
 let currentMode = "edit";
 let currentId = null;
 
-const PASS_KEY = "mrb_portal_admin_pass";
-let passResolver = null;
+// promessa do modal de confirmação
+let confirmResolver = null;
 
 function setStatus(msg) { statusEl.textContent = msg || ""; }
 
@@ -35,32 +40,7 @@ function escapeHtml(str) {
     .replaceAll("'", "&#039;");
 }
 
-function getPass() { return sessionStorage.getItem(PASS_KEY) || ""; }
-function setPass(p) { sessionStorage.setItem(PASS_KEY, String(p || "")); }
-function hasPass() { return !!getPass(); }
-
-function openPassModal() {
-  passModal.setAttribute("aria-hidden", "false");
-  const input = passForm.elements.password;
-  input.value = "";
-  setTimeout(() => input.focus(), 30);
-}
-function closePassModal() { passModal.setAttribute("aria-hidden", "true"); }
-
-function requirePassConfirm() {
-  if (hasPass()) return Promise.resolve(true);
-  openPassModal();
-  return new Promise((resolve) => { passResolver = resolve; });
-}
-function resolvePass(ok) {
-  if (typeof passResolver === "function") {
-    const fn = passResolver;
-    passResolver = null;
-    fn(ok);
-  }
-}
-
-// preview
+// ---------- preview ----------
 function setPreviewFromUrl(url) {
   const clean = String(url || "").trim();
   if (!clean) {
@@ -75,7 +55,6 @@ function setPreviewFromUrl(url) {
 }
 
 imageUrlEl.addEventListener("input", () => setPreviewFromUrl(imageUrlEl.value));
-
 imageFileEl.addEventListener("change", () => {
   const file = imageFileEl.files?.[0];
   if (!file) return;
@@ -83,7 +62,46 @@ imageFileEl.addEventListener("change", () => {
   setPreviewFromUrl(localUrl);
 });
 
-// modal
+// ---------- modal senha por ação ----------
+function openConfirmModal({ title, text }) {
+  confirmTitle.textContent = title || "Confirmar";
+  confirmText.textContent = text || "Digite a senha para confirmar.";
+  confirmPass.value = "";
+  confirmModal.setAttribute("aria-hidden", "false");
+  setTimeout(() => confirmPass.focus(), 30);
+
+  return new Promise((resolve) => {
+    confirmResolver = resolve;
+  });
+}
+
+function closeConfirmModal() {
+  confirmModal.setAttribute("aria-hidden", "true");
+}
+
+function resolveConfirm(result) {
+  if (typeof confirmResolver === "function") {
+    const fn = confirmResolver;
+    confirmResolver = null;
+    fn(result);
+  }
+}
+
+// submit do modal confirmação
+confirmForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const pass = (confirmPass.value || "").trim();
+  closeConfirmModal();
+  resolveConfirm({ ok: !!pass, pass });
+});
+
+confirmCancel.addEventListener("click", (e) => {
+  e.preventDefault();
+  closeConfirmModal();
+  resolveConfirm({ ok: false, pass: "" });
+});
+
+// ---------- modal card ----------
 function openCardModal(mode, card) {
   currentMode = mode;
   currentId = card?.id || null;
@@ -125,6 +143,7 @@ function openCard(url) {
   window.open(url, "_blank", "noopener,noreferrer");
 }
 
+// ---------- render ----------
 function cardHtml(c) {
   const title = escapeHtml(c.title);
   const category = escapeHtml(c.category || "");
@@ -140,7 +159,6 @@ function cardHtml(c) {
       data-url="${escapeHtml(c.url)}"
     >
       <div class="card__actions">
-        <button class="icon-btn" data-action="settings" aria-label="Configurações">⚙</button>
         <button class="icon-btn" data-action="edit" aria-label="Editar">✏</button>
       </div>
 
@@ -169,19 +187,17 @@ function render(cards) {
   grid.insertAdjacentHTML("beforeend", addCardHtml());
 }
 
+// ---------- API ----------
 async function api(path, opts = {}) {
-  const pass = getPass();
   const headers = { ...(opts.headers || {}) };
-
   const method = String(opts.method || "GET").toUpperCase();
-  const needsAuth = ["POST","PUT","PATCH","DELETE"].includes(method);
 
   if (!(opts.body instanceof FormData)) headers["Content-Type"] = "application/json";
-  if (needsAuth && pass) headers["x-admin-password"] = pass;
 
   const res = await fetch(path, { ...opts, headers });
   const isJson = (res.headers.get("content-type") || "").includes("application/json");
   const body = isJson ? await res.json() : await res.text();
+
   if (!res.ok) throw new Error(body?.error || `Erro HTTP ${res.status}`);
   return body;
 }
@@ -209,30 +225,19 @@ function applyFilter() {
   render(filtered);
 }
 
-function openSettings(id) {
-  const card = allCards.find((c) => String(c.id) === String(id));
-  if (!card) return;
-  alert(
-    `Detalhes do card:\n\n` +
-    `ID: ${card.id}\n` +
-    `Título: ${card.title}\n` +
-    `Categoria: ${card.category || "-"}\n` +
-    `URL: ${card.url}\n` +
-    `Imagem: ${card.image || "-"}`
-  );
-}
+searchEl.addEventListener("input", applyFilter);
 
+// ---------- ações ----------
 function openEditModal(id) {
   const card = allCards.find((c) => String(c.id) === String(id));
   if (!card) return;
   openCardModal("edit", card);
 }
-
 function openCreateModal() {
   openCardModal("create", null);
 }
 
-// grid events
+// grid click
 grid.addEventListener("click", (e) => {
   const actionBtn = e.target.closest("[data-action]");
   const cardEl = e.target.closest(".card");
@@ -242,8 +247,6 @@ grid.addEventListener("click", (e) => {
     e.stopPropagation();
     const action = actionBtn.dataset.action;
     const id = cardEl.dataset.id;
-
-    if (action === "settings") return openSettings(id);
     if (action === "edit") return openEditModal(id);
     return;
   }
@@ -254,84 +257,65 @@ grid.addEventListener("click", (e) => {
   if (url) openCard(url);
 });
 
-grid.addEventListener("keydown", (e) => {
-  if (e.key !== "Enter" && e.key !== " ") return;
-  const cardEl = e.target.closest(".card");
-  if (!cardEl) return;
-
-  e.preventDefault();
-  if (cardEl.dataset.add === "1") return openCreateModal();
-
-  const url = cardEl.dataset.url;
-  if (url) openCard(url);
-});
-
-// close modals
+// close modals by click
 document.addEventListener("click", (e) => {
   if (e.target.closest("#card-modal [data-close]")) closeCardModal();
-  if (e.target.closest("#pass-modal [data-close]")) {
-    closePassModal();
-    resolvePass(false);
+  if (e.target.closest("#confirm-modal [data-close]")) {
+    closeConfirmModal();
+    resolveConfirm({ ok: false, pass: "" });
   }
 });
 
+// esc
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
   if (cardModal.getAttribute("aria-hidden") === "false") closeCardModal();
-  if (passModal.getAttribute("aria-hidden") === "false") {
-    closePassModal();
-    resolvePass(false);
+  if (confirmModal.getAttribute("aria-hidden") === "false") {
+    closeConfirmModal();
+    resolveConfirm({ ok: false, pass: "" });
   }
 });
 
-adminBtn.addEventListener("click", () => openPassModal());
-searchEl.addEventListener("input", applyFilter);
-
-// pass modal submit
-passForm.addEventListener("submit", (e) => {
-  e.preventDefault();
-  const p = passForm.elements.password.value || "";
-  setPass(p);
-  closePassModal();
-  resolvePass(!!p);
-});
-passCancelBtn.addEventListener("click", (e) => {
-  e.preventDefault();
-  closePassModal();
-  resolvePass(false);
-});
-
-// upload helper
-async function uploadSelectedImageIfAny() {
+// ---------- Upload helper (senha sempre) ----------
+async function uploadSelectedImageIfAny(password) {
   const file = imageFileEl.files?.[0];
   if (!file) return null;
-
-  const ok = await requirePassConfirm();
-  if (!ok) return null;
 
   const fd = new FormData();
   fd.append("file", file);
 
-  const result = await api("/api/upload", { method: "POST", body: fd });
+  const result = await api("/api/upload", {
+    method: "POST",
+    body: fd,
+    headers: { "x-admin-password": password },
+  });
+
   return result.url;
 }
 
-// save (create/edit) — senha só aqui
+// ---------- Save (senha sempre) ----------
 cardForm.addEventListener("submit", async (e) => {
   e.preventDefault();
+
   try {
-    // 1) upload se tiver arquivo
-    const uploadedUrl = await uploadSelectedImageIfAny();
+    // pede senha somente aqui (sempre)
+    const conf = await openConfirmModal({
+      title: "Confirmar alteração",
+      text: currentMode === "create"
+        ? "Digite a senha para criar este card."
+        : "Digite a senha para salvar as alterações deste card.",
+    });
+
+    if (!conf.ok) return;
+
+    // se tiver arquivo, faz upload usando a senha confirmada
+    const uploadedUrl = await uploadSelectedImageIfAny(conf.pass);
     let imageUrl = uploadedUrl || (imageUrlEl.value || "").trim();
 
     if (uploadedUrl) {
       imageUrlEl.value = uploadedUrl;
       setPreviewFromUrl(uploadedUrl);
     }
-
-    // 2) pede senha pra salvar (se ainda não tiver)
-    const ok = await requirePassConfirm();
-    if (!ok) return;
 
     const payload = {
       title: cardForm.elements.title.value,
@@ -342,12 +326,17 @@ cardForm.addEventListener("submit", async (e) => {
     };
 
     if (currentMode === "create") {
-      await api("/api/cards", { method: "POST", body: JSON.stringify(payload) });
+      await api("/api/cards", {
+        method: "POST",
+        body: JSON.stringify(payload),
+        headers: { "x-admin-password": conf.pass },
+      });
     } else {
       const id = cardForm.elements.id.value;
       await api(`/api/cards/${encodeURIComponent(id)}`, {
         method: "PUT",
         body: JSON.stringify(payload),
+        headers: { "x-admin-password": conf.pass },
       });
     }
 
@@ -358,7 +347,7 @@ cardForm.addEventListener("submit", async (e) => {
   }
 });
 
-// delete — senha só aqui
+// ---------- Delete (senha sempre) ----------
 deleteBtn.addEventListener("click", async () => {
   try {
     const id = currentId || cardForm.elements.id.value;
@@ -366,10 +355,17 @@ deleteBtn.addEventListener("click", async () => {
 
     if (!confirm("Tem certeza que deseja excluir este card?")) return;
 
-    const ok = await requirePassConfirm();
-    if (!ok) return;
+    const conf = await openConfirmModal({
+      title: "Confirmar exclusão",
+      text: "Digite a senha para excluir este card.",
+    });
 
-    await api(`/api/cards/${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (!conf.ok) return;
+
+    await api(`/api/cards/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      headers: { "x-admin-password": conf.pass },
+    });
 
     closeCardModal();
     await load();
@@ -378,4 +374,5 @@ deleteBtn.addEventListener("click", async () => {
   }
 });
 
+// Boot
 load();

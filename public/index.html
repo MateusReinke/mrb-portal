@@ -4,25 +4,23 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Portal MRB Automações</title>
-  <link rel="stylesheet" href="/style.css?v=8088" />
+  <link rel="stylesheet" href="/style.css?v=modern1" />
 </head>
 <body>
   <main class="page">
     <header class="hero">
+      <div class="hero__badge">MRB Portal</div>
       <h1 class="hero__title">Portal MRB Automações</h1>
       <p class="hero__subtitle">Central de aplicações • Infraestrutura privada</p>
 
       <div class="hero__controls">
         <input id="search" class="search" placeholder="Buscar..." />
-        <button id="adminBtn" class="btn btn--ghost" type="button">Senha admin</button>
+        <span id="status" class="status"></span>
       </div>
     </header>
 
     <section class="wrap">
       <section id="cards-grid" class="grid" aria-label="Cards"></section>
-      <div class="footer">
-        <span id="status" class="status"></span>
-      </div>
     </section>
   </main>
 
@@ -39,7 +37,7 @@
       <form id="card-form" class="modal__form">
         <input type="hidden" name="id" />
 
-        <!-- ✅ PREVIEW + UPLOAD no TOPO -->
+        <!-- Preview + upload -->
         <section class="imageBox">
           <div class="imageBox__preview">
             <img id="imgPreview" alt="" />
@@ -58,7 +56,7 @@
             </label>
 
             <p class="hint mini">
-              Ao salvar, se você escolher arquivo, ele será enviado e usado no card.
+              Upload usa o servidor e exige senha no momento da confirmação.
             </p>
           </div>
         </section>
@@ -86,39 +84,41 @@
         <footer class="modal__footer">
           <button type="button" class="btn btn--danger" id="deleteBtn">Excluir</button>
           <div class="spacer"></div>
-          <button type="button" class="btn" data-close="1">Cancelar</button>
+          <button type="button" class="btn btn--ghost" data-close="1">Cancelar</button>
           <button type="submit" class="btn btn--primary">Salvar</button>
         </footer>
       </form>
     </div>
   </div>
 
-  <!-- Modal senha -->
-  <div id="pass-modal" class="modal" aria-hidden="true">
+  <!-- ✅ Modal SENHA por ação (NÃO salva em sessão) -->
+  <div id="confirm-modal" class="modal" aria-hidden="true">
     <div class="modal__backdrop" data-close="1"></div>
 
-    <div class="modal__panel" role="dialog" aria-modal="true" aria-label="Senha admin">
+    <div class="modal__panel" role="dialog" aria-modal="true" aria-label="Confirmar senha">
       <header class="modal__header">
-        <h2 class="modal__title">Senha admin</h2>
+        <h2 class="modal__title" id="confirm-title">Confirmar</h2>
         <button class="icon-btn" data-close="1" aria-label="Fechar">✕</button>
       </header>
 
-      <form id="pass-form" class="modal__form">
+      <form id="confirm-form" class="modal__form">
+        <p class="hint" id="confirm-text" style="margin-top:0;">
+          Digite a senha para confirmar.
+        </p>
+
         <label class="field">
-          <span>Digite a senha</span>
-          <input name="password" type="password" placeholder="••••••••" autocomplete="current-password" />
+          <span>Senha admin</span>
+          <input id="confirmPass" name="password" type="password" placeholder="••••••••" autocomplete="current-password" />
         </label>
 
         <footer class="modal__footer">
-          <button type="button" class="btn" data-close="1" id="passCancel">Cancelar</button>
+          <button type="button" class="btn btn--ghost" data-close="1" id="confirmCancel">Cancelar</button>
           <button type="submit" class="btn btn--primary">Confirmar</button>
         </footer>
-
-        <p class="hint">A senha fica salva apenas nesta sessão do navegador.</p>
       </form>
     </div>
   </div>
 
-  <script src="/app.js?v=8088"></script>
+  <script src="/app.js?v=modern1"></script>
 </body>
 </html>
