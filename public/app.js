@@ -1,3 +1,5 @@
+// public/app.js (COMPLETO)
+
 const grid = document.querySelector("#cards-grid");
 const statusEl = document.querySelector("#status");
 const searchEl = document.querySelector("#search");
@@ -150,7 +152,6 @@ async function api(path, opts = {}) {
   if (needsAuth && pass) headers["x-admin-password"] = pass;
 
   const res = await fetch(path, { ...opts, headers });
-
   const isJson = (res.headers.get("content-type") || "").includes("application/json");
   const body = isJson ? await res.json() : await res.text();
 
@@ -208,6 +209,7 @@ function openCreateModal() {
   openCardModal("create", null);
 }
 
+// Grid events
 grid.addEventListener("click", (e) => {
   const actionBtn = e.target.closest("[data-action]");
   const cardEl = e.target.closest(".card");
@@ -230,6 +232,7 @@ grid.addEventListener("click", (e) => {
   if (url) openCard(url);
 });
 
+// keyboard
 grid.addEventListener("keydown", (e) => {
   if (e.key !== "Enter" && e.key !== " ") return;
   const cardEl = e.target.closest(".card");
@@ -242,6 +245,7 @@ grid.addEventListener("keydown", (e) => {
   if (url) openCard(url);
 });
 
+// close modals
 document.addEventListener("click", (e) => {
   if (e.target.closest("#card-modal [data-close]")) closeCardModal();
   if (e.target.closest("#pass-modal [data-close]")) closePassModal();

@@ -1,9 +1,13 @@
+# Dockerfile (COMPLETO)
+# ✅ Node 22
+# ✅ Porta 8088
+# ✅ Sem npm ci (não exige package-lock.json)
+
 FROM node:22-alpine
 
 WORKDIR /app
 
 COPY package*.json ./
-
 RUN npm install --omit=dev
 
 COPY . .
