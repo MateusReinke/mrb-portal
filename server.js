@@ -1,32 +1,24 @@
 const express = require("express");
 const path = require("path");
 const fs = require("fs");
+const crypto = require("crypto");
 const multer = require("multer");
 
 const app = express();
-
-// ✅ Porta
 const PORT = Number(process.env.PORT ?? 8088);
 
-// ✅ Normaliza env (remove espaços e aspas acidentais)
 function normalizeSecret(value, fallback) {
-  let v = (value ?? fallback ?? "").toString();
-
-  // remove whitespace em volta
-  v = v.trim();
-
-  // remove aspas envolvendo o valor (caso você tenha colocado "1234" no Coolify)
+  let v = (value ?? fallback ?? "").toString().trim();
   if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
     v = v.slice(1, -1).trim();
   }
-
+  // remove quebras de linha invisíveis
+  v = v.replace(/\r?\n/g, "").trim();
   return v;
 }
 
-// 🔐 senha admin (defina no Coolify)
 const ADMIN_PASSWORD = normalizeSecret(process.env.ADMIN_PASSWORD, "1537");
 
-// ✅ estrutura do seu projeto
 const DATA_FILE = path.join(__dirname, "data", "data.json");
 const PUBLIC_DIR = path.join(__dirname, "public");
 const UPLOAD_DIR = path.join(PUBLIC_DIR, "uploads");
@@ -42,13 +34,10 @@ ensureDir(UPLOAD_DIR);
 app.use(express.static(PUBLIC_DIR));
 app.use("/uploads", express.static(UPLOAD_DIR));
 
-// ---------- Data helpers ----------
+// ---------- Data ----------
 function ensureDataFile() {
-  if (!fs.existsSync(DATA_FILE)) {
-    fs.writeFileSync(DATA_FILE, JSON.stringify([], null, 2), "utf-8");
-  }
+  if (!fs.existsSync(DATA_FILE)) fs.writeFileSync(DATA_FILE, JSON.stringify([], null, 2), "utf-8");
 }
-
 function readCards() {
   ensureDataFile();
   const raw = fs.readFileSync(DATA_FILE, "utf-8").trim();
@@ -60,67 +49,82 @@ function readCards() {
     return [];
   }
 }
-
 function writeCards(cards) {
   ensureDataFile();
   fs.writeFileSync(DATA_FILE, JSON.stringify(cards, null, 2), "utf-8");
 }
-
 function normalizeCard(input) {
   const title = String(input.title ?? "").trim();
   const category = String(input.category ?? "").trim();
   const url = String(input.url ?? "").trim();
   const image = String(input.image ?? "").trim();
   const description = String(input.description ?? "").trim();
-
   if (!title) throw new Error("Título é obrigatório");
   if (!url) throw new Error("URL é obrigatória");
-
   return { title, category, url, image, description };
 }
 
 // ---------- Auth ----------
+function sha8(s) {
+  return crypto.createHash("sha256").update(String(s ?? ""), "utf8").digest("hex").slice(0, 10);
+}
+
 function getProvidedPassword(req) {
   const headerPass = String(req.headers["x-admin-password"] || "").trim();
 
   const auth = String(req.headers["authorization"] || "").trim();
   const bearer = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
 
-  return headerPass || bearer;
+  // ✅ tenta os dois
+  const pass = headerPass || bearer;
+
+  // ✅ normaliza também o recebido
+  return normalizeSecret(pass, "");
 }
 
 function isAuthorized(req) {
-  const pass = getProvidedPassword(req);
-  return !!pass && pass === ADMIN_PASSWORD;
+  const provided = getProvidedPassword(req);
+  return !!provided && provided === ADMIN_PASSWORD;
 }
 
 function requireAuth(req, res, next) {
   if (!isAuthorized(req)) {
+    const provided = getProvidedPassword(req);
+
     return res.status(401).json({
       error: "Senha inválida ou não informada.",
-      // ✅ Ajuda no diagnóstico SEM revelar a senha
       debug: {
         env_has_admin_password: !!process.env.ADMIN_PASSWORD,
-        env_admin_password_length: ADMIN_PASSWORD.length,
-        provided_password_length: getProvidedPassword(req).length,
+        env_admin_len: ADMIN_PASSWORD.length,
+        env_admin_hash8: sha8(ADMIN_PASSWORD),
+
+        provided_len: provided.length,
+        provided_hash8: sha8(provided),
+
+        has_x_admin_password_header: !!req.headers["x-admin-password"],
+        has_authorization_header: !!req.headers["authorization"],
       },
     });
   }
   next();
 }
 
-// ✅ Endpoint de diagnóstico (não revela senha)
+// ✅ endpoint para você diagnosticar sem vazar senha
 app.post("/api/auth-check", (req, res) => {
-  const ok = isAuthorized(req);
+  const provided = getProvidedPassword(req);
   res.json({
-    ok,
+    ok: provided === ADMIN_PASSWORD,
     env_has_admin_password: !!process.env.ADMIN_PASSWORD,
-    env_admin_password_length: ADMIN_PASSWORD.length,
-    provided_password_length: getProvidedPassword(req).length,
+    env_admin_len: ADMIN_PASSWORD.length,
+    env_admin_hash8: sha8(ADMIN_PASSWORD),
+    provided_len: provided.length,
+    provided_hash8: sha8(provided),
+    has_x_admin_password_header: !!req.headers["x-admin-password"],
+    has_authorization_header: !!req.headers["authorization"],
   });
 });
 
-// ---------- Upload (multer) ----------
+// ---------- Upload ----------
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOAD_DIR),
   filename: (req, file, cb) => {
@@ -175,7 +179,6 @@ app.put("/api/cards/:id", requireAuth, (req, res) => {
   try {
     const cards = readCards();
     const id = Number(req.params.id);
-
     const idx = cards.findIndex((c) => Number(c.id) === id);
     if (idx === -1) return res.status(404).json({ error: "Card não encontrado" });
 
@@ -202,7 +205,6 @@ app.delete("/api/cards/:id", requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
-// SPA fallback
 app.get("*", (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, "index.html"));
 });
@@ -212,4 +214,5 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log("LISTENING PORT =", PORT);
   console.log("ENV ADMIN_PASSWORD exists? ", !!process.env.ADMIN_PASSWORD);
   console.log("ADMIN_PASSWORD length =", ADMIN_PASSWORD.length);
+  console.log("ADMIN_PASSWORD hash8 =", sha8(ADMIN_PASSWORD));
 });

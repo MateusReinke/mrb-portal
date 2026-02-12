@@ -2,13 +2,11 @@ const grid = document.querySelector("#cards-grid");
 const statusEl = document.querySelector("#status");
 const searchEl = document.querySelector("#search");
 
-// modais
 const cardModal = document.querySelector("#card-modal");
 const cardModalTitle = document.querySelector("#modal-title");
 const cardForm = document.querySelector("#card-form");
 const deleteBtn = document.querySelector("#deleteBtn");
 
-// confirmar senha por ação
 const confirmModal = document.querySelector("#confirm-modal");
 const confirmForm = document.querySelector("#confirm-form");
 const confirmTitle = document.querySelector("#confirm-title");
@@ -16,7 +14,6 @@ const confirmText = document.querySelector("#confirm-text");
 const confirmPass = document.querySelector("#confirmPass");
 const confirmCancel = document.querySelector("#confirmCancel");
 
-// imagem
 const imageUrlEl = document.querySelector("#imageUrl");
 const imageFileEl = document.querySelector("#imageFile");
 const imgPreviewEl = document.querySelector("#imgPreview");
@@ -26,7 +23,6 @@ let allCards = [];
 let currentMode = "edit";
 let currentId = null;
 
-// promessa do modal de confirmação
 let confirmResolver = null;
 
 function setStatus(msg) { statusEl.textContent = msg || ""; }
@@ -40,7 +36,6 @@ function escapeHtml(str) {
     .replaceAll("'", "&#039;");
 }
 
-// ---------- preview ----------
 function setPreviewFromUrl(url) {
   const clean = String(url || "").trim();
   if (!clean) {
@@ -53,16 +48,14 @@ function setPreviewFromUrl(url) {
   imgPreviewEl.style.display = "block";
   imgPreviewEl.src = clean;
 }
-
 imageUrlEl.addEventListener("input", () => setPreviewFromUrl(imageUrlEl.value));
 imageFileEl.addEventListener("change", () => {
   const file = imageFileEl.files?.[0];
   if (!file) return;
-  const localUrl = URL.createObjectURL(file);
-  setPreviewFromUrl(localUrl);
+  setPreviewFromUrl(URL.createObjectURL(file));
 });
 
-// ---------- modal senha por ação ----------
+// ---------- Confirm modal ----------
 function openConfirmModal({ title, text }) {
   confirmTitle.textContent = title || "Confirmar";
   confirmText.textContent = text || "Digite a senha para confirmar.";
@@ -70,15 +63,9 @@ function openConfirmModal({ title, text }) {
   confirmModal.setAttribute("aria-hidden", "false");
   setTimeout(() => confirmPass.focus(), 30);
 
-  return new Promise((resolve) => {
-    confirmResolver = resolve;
-  });
+  return new Promise((resolve) => { confirmResolver = resolve; });
 }
-
-function closeConfirmModal() {
-  confirmModal.setAttribute("aria-hidden", "true");
-}
-
+function closeConfirmModal() { confirmModal.setAttribute("aria-hidden", "true"); }
 function resolveConfirm(result) {
   if (typeof confirmResolver === "function") {
     const fn = confirmResolver;
@@ -86,28 +73,24 @@ function resolveConfirm(result) {
     fn(result);
   }
 }
-
-// submit do modal confirmação
 confirmForm.addEventListener("submit", (e) => {
   e.preventDefault();
   const pass = (confirmPass.value || "").trim();
   closeConfirmModal();
   resolveConfirm({ ok: !!pass, pass });
 });
-
 confirmCancel.addEventListener("click", (e) => {
   e.preventDefault();
   closeConfirmModal();
   resolveConfirm({ ok: false, pass: "" });
 });
 
-// ---------- modal card ----------
+// ---------- Card modal ----------
 function openCardModal(mode, card) {
   currentMode = mode;
   currentId = card?.id || null;
 
   cardModal.setAttribute("aria-hidden", "false");
-
   imageFileEl.value = "";
   setPreviewFromUrl("");
 
@@ -128,22 +111,19 @@ function openCardModal(mode, card) {
   cardForm.elements.category.value = card.category ?? "";
   cardForm.elements.url.value = card.url ?? "";
   cardForm.elements.description.value = card.description ?? "";
-
   imageUrlEl.value = card.image ?? "";
   setPreviewFromUrl(card.image ?? "");
 }
-
 function closeCardModal() {
   cardModal.setAttribute("aria-hidden", "true");
   currentId = null;
 }
-
 function openCard(url) {
   if (!url) return;
   window.open(url, "_blank", "noopener,noreferrer");
 }
 
-// ---------- render ----------
+// ---------- Render ----------
 function cardHtml(c) {
   const title = escapeHtml(c.title);
   const category = escapeHtml(c.category || "");
@@ -154,14 +134,10 @@ function cardHtml(c) {
     : `<div class="card__img" aria-hidden="true"></div>`;
 
   return `
-    <article class="card" role="button" tabindex="0"
-      data-id="${escapeHtml(c.id)}"
-      data-url="${escapeHtml(c.url)}"
-    >
+    <article class="card" role="button" tabindex="0" data-id="${escapeHtml(c.id)}" data-url="${escapeHtml(c.url)}">
       <div class="card__actions">
         <button class="icon-btn" data-action="edit" aria-label="Editar">✏</button>
       </div>
-
       <div class="card__center">
         ${imgHtml}
         <h3 class="card__title">${title}</h3>
@@ -170,17 +146,13 @@ function cardHtml(c) {
     </article>
   `;
 }
-
 function addCardHtml() {
   return `
     <article class="card card--add" role="button" tabindex="0" data-add="1">
-      <div class="card__center">
-        <div class="plus">+</div>
-      </div>
+      <div class="card__center"><div class="plus">+</div></div>
     </article>
   `;
 }
-
 function render(cards) {
   grid.innerHTML = "";
   for (const c of cards) grid.insertAdjacentHTML("beforeend", cardHtml(c));
@@ -213,7 +185,6 @@ async function load() {
     setStatus(`Erro: ${e.message}`);
   }
 }
-
 function applyFilter() {
   const q = (searchEl.value || "").trim().toLowerCase();
   if (!q) return render(allCards);
@@ -224,20 +195,16 @@ function applyFilter() {
   });
   render(filtered);
 }
-
 searchEl.addEventListener("input", applyFilter);
 
-// ---------- ações ----------
+// ---------- Actions ----------
 function openEditModal(id) {
   const card = allCards.find((c) => String(c.id) === String(id));
   if (!card) return;
   openCardModal("edit", card);
 }
-function openCreateModal() {
-  openCardModal("create", null);
-}
+function openCreateModal() { openCardModal("create", null); }
 
-// grid click
 grid.addEventListener("click", (e) => {
   const actionBtn = e.target.closest("[data-action]");
   const cardEl = e.target.closest(".card");
@@ -245,19 +212,16 @@ grid.addEventListener("click", (e) => {
 
   if (actionBtn) {
     e.stopPropagation();
-    const action = actionBtn.dataset.action;
     const id = cardEl.dataset.id;
-    if (action === "edit") return openEditModal(id);
-    return;
+    return openEditModal(id);
   }
 
   if (cardEl.dataset.add === "1") return openCreateModal();
-
   const url = cardEl.dataset.url;
   if (url) openCard(url);
 });
 
-// close modals by click
+// close modals
 document.addEventListener("click", (e) => {
   if (e.target.closest("#card-modal [data-close]")) closeCardModal();
   if (e.target.closest("#confirm-modal [data-close]")) {
@@ -266,7 +230,6 @@ document.addEventListener("click", (e) => {
   }
 });
 
-// esc
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
   if (cardModal.getAttribute("aria-hidden") === "false") closeCardModal();
@@ -276,7 +239,16 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-// ---------- Upload helper (senha sempre) ----------
+// helper: cria headers com 2 formas
+function authHeaders(pass) {
+  const p = String(pass || "").trim();
+  return {
+    "x-admin-password": p,
+    "Authorization": `Bearer ${p}`,
+  };
+}
+
+// upload
 async function uploadSelectedImageIfAny(password) {
   const file = imageFileEl.files?.[0];
   if (!file) return null;
@@ -287,30 +259,27 @@ async function uploadSelectedImageIfAny(password) {
   const result = await api("/api/upload", {
     method: "POST",
     body: fd,
-    headers: { "x-admin-password": password },
+    headers: authHeaders(password),
   });
 
   return result.url;
 }
 
-// ---------- Save (senha sempre) ----------
+// save (sempre pede senha)
 cardForm.addEventListener("submit", async (e) => {
   e.preventDefault();
 
   try {
-    // pede senha somente aqui (sempre)
     const conf = await openConfirmModal({
       title: "Confirmar alteração",
       text: currentMode === "create"
         ? "Digite a senha para criar este card."
         : "Digite a senha para salvar as alterações deste card.",
     });
-
     if (!conf.ok) return;
 
-    // se tiver arquivo, faz upload usando a senha confirmada
     const uploadedUrl = await uploadSelectedImageIfAny(conf.pass);
-    let imageUrl = uploadedUrl || (imageUrlEl.value || "").trim();
+    const imageUrl = uploadedUrl || (imageUrlEl.value || "").trim();
 
     if (uploadedUrl) {
       imageUrlEl.value = uploadedUrl;
@@ -329,14 +298,14 @@ cardForm.addEventListener("submit", async (e) => {
       await api("/api/cards", {
         method: "POST",
         body: JSON.stringify(payload),
-        headers: { "x-admin-password": conf.pass },
+        headers: authHeaders(conf.pass),
       });
     } else {
       const id = cardForm.elements.id.value;
       await api(`/api/cards/${encodeURIComponent(id)}`, {
         method: "PUT",
         body: JSON.stringify(payload),
-        headers: { "x-admin-password": conf.pass },
+        headers: authHeaders(conf.pass),
       });
     }
 
@@ -347,7 +316,7 @@ cardForm.addEventListener("submit", async (e) => {
   }
 });
 
-// ---------- Delete (senha sempre) ----------
+// delete (sempre pede senha)
 deleteBtn.addEventListener("click", async () => {
   try {
     const id = currentId || cardForm.elements.id.value;
@@ -359,12 +328,11 @@ deleteBtn.addEventListener("click", async () => {
       title: "Confirmar exclusão",
       text: "Digite a senha para excluir este card.",
     });
-
     if (!conf.ok) return;
 
     await api(`/api/cards/${encodeURIComponent(id)}`, {
       method: "DELETE",
-      headers: { "x-admin-password": conf.pass },
+      headers: authHeaders(conf.pass),
     });
 
     closeCardModal();
@@ -374,5 +342,4 @@ deleteBtn.addEventListener("click", async () => {
   }
 });
 
-// Boot
 load();
