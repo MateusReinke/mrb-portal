@@ -174,14 +174,23 @@ body{
   text-align:center;
 }
 
+/* ✅ LOGO: sem caixa (sem fundo/borda/sombra) */
 .card__img{
   width: 56px;
   height: 56px;
-  border-radius: 16px;
+
+  display:block;
   object-fit: contain;
-  background: rgba(0,0,0,.20);
-  border: 1px solid rgba(255,255,255,.10);
-  box-shadow: 0 10px 22px rgba(0,0,0,.35);
+
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}
+
+/* (Opcional) melhora o alinhamento e evita “pular” se a imagem falhar) */
+.card__img[style*="display: none"]{
+  display:none !important;
 }
 
 .card__title{
