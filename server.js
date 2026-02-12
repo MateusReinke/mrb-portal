@@ -1,34 +1,39 @@
 // server.js (COMPLETO)
 // ✅ Lê/Salva cards em: ./data/data.json (ARRAY)
 // ✅ Static em: ./public
+// ✅ Upload de imagem em: ./public/uploads (protegido por senha)
 // ✅ CRUD protegido por senha (ADMIN_PASSWORD)
 // ✅ Porta: 8088 (ou env PORT)
 
 const express = require("express");
 const path = require("path");
 const fs = require("fs");
+const multer = require("multer");
 
 const app = express();
-
-// ✅ porta do app
 const PORT = Number(process.env.PORT || 8088);
-
-// 🔐 senha admin (defina no Coolify)
 const ADMIN_PASSWORD = String(process.env.ADMIN_PASSWORD || "1537");
 
-// ✅ arquivo real (conforme sua estrutura)
 const DATA_FILE = path.join(__dirname, "data", "data.json");
+const PUBLIC_DIR = path.join(__dirname, "public");
+const UPLOAD_DIR = path.join(PUBLIC_DIR, "uploads");
 
-app.use(express.json({ limit: "2mb" }));
+app.use(express.json({ limit: "5mb" }));
 
-// ✅ serve tudo em /public (inclui /style.css e /app.js)
-app.use(express.static(path.join(__dirname, "public")));
-
-// --------- Helpers ----------
-function ensureDataFile() {
-  const dir = path.dirname(DATA_FILE);
+// ✅ garante pastas
+function ensureDir(dir) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+}
+ensureDir(path.dirname(DATA_FILE));
+ensureDir(UPLOAD_DIR);
 
+// ✅ serve public
+app.use(express.static(PUBLIC_DIR));
+// ✅ (opcional) explicitar uploads
+app.use("/uploads", express.static(UPLOAD_DIR));
+
+// ---------- Helpers ----------
+function ensureDataFile() {
   if (!fs.existsSync(DATA_FILE)) {
     fs.writeFileSync(DATA_FILE, JSON.stringify([], null, 2), "utf-8");
   }
@@ -81,11 +86,45 @@ function requireAuth(req, res, next) {
   next();
 }
 
-// --------- API ----------
+// ---------- Upload (multer) ----------
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, UPLOAD_DIR),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname || "").toLowerCase() || "";
+    const safeExt = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"].includes(ext) ? ext : "";
+    const name = `img_${Date.now()}_${Math.random().toString(16).slice(2)}${safeExt}`;
+    cb(null, name);
+  },
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 3 * 1024 * 1024 }, // 3MB
+  fileFilter: (req, file, cb) => {
+    const ok = [
+      "image/png",
+      "image/jpeg",
+      "image/gif",
+      "image/webp",
+      "image/svg+xml",
+    ].includes(file.mimetype);
+    if (!ok) return cb(new Error("Tipo de arquivo inválido. Envie PNG/JPG/GIF/WEBP/SVG."));
+    cb(null, true);
+  },
+});
+
+// ---------- API ----------
 app.get("/api/health", (req, res) => res.json({ ok: true }));
 
-app.get("/api/cards", (req, res) => {
-  res.json(readCards());
+app.get("/api/cards", (req, res) => res.json(readCards()));
+
+// ✅ Upload protegido (só pede senha quando tentar enviar)
+app.post("/api/upload", requireAuth, upload.single("file"), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "Arquivo não enviado." });
+
+  // url pública
+  const url = `/uploads/${req.file.filename}`;
+  res.json({ url });
 });
 
 app.post("/api/cards", requireAuth, (req, res) => {
@@ -104,6 +143,7 @@ app.post("/api/cards", requireAuth, (req, res) => {
 
     cards.push(created);
     writeCards(cards);
+
     res.status(201).json(created);
   } catch (err) {
     res.status(400).json({ error: err.message || "Erro ao criar card" });
@@ -114,20 +154,15 @@ app.put("/api/cards/:id", requireAuth, (req, res) => {
   try {
     const cards = readCards();
     const id = Number(req.params.id);
-
     const idx = cards.findIndex((c) => Number(c.id) === id);
     if (idx === -1) return res.status(404).json({ error: "Card não encontrado" });
 
     const patch = normalizeCard(req.body);
-
-    const updated = {
-      ...cards[idx],
-      ...patch,
-      updatedAt: new Date().toISOString(),
-    };
+    const updated = { ...cards[idx], ...patch, updatedAt: new Date().toISOString() };
 
     cards[idx] = updated;
     writeCards(cards);
+
     res.json(updated);
   } catch (err) {
     res.status(400).json({ error: err.message || "Erro ao atualizar card" });
@@ -139,19 +174,17 @@ app.delete("/api/cards/:id", requireAuth, (req, res) => {
   const id = Number(req.params.id);
 
   const filtered = cards.filter((c) => Number(c.id) !== id);
-  if (filtered.length === cards.length) {
-    return res.status(404).json({ error: "Card não encontrado" });
-  }
+  if (filtered.length === cards.length) return res.status(404).json({ error: "Card não encontrado" });
 
   writeCards(filtered);
   res.json({ ok: true });
 });
 
-// ✅ SPA fallback
+// SPA fallback
 app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
+  res.sendFile(path.join(PUBLIC_DIR, "index.html"));
 });
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`✅ MRB Portal rodando em http://0.0.0.0:${PORT}`);
+  console.log(`✅ MRB Portal em http://0.0.0.0:${PORT}`);
 });

@@ -1,8 +1,7 @@
 // public/app.js (COMPLETO)
-// ✅ Render no estilo do print (ícone grande central, título + categoria)
-// ✅ Card todo clicável, botões não abrem link
-// ✅ + card tracejado
-// 🔐 CRUD pede senha (salva na sessionStorage)
+// ✅ Senha só é pedida ao SALVAR/EXCLUIR/UPLOAD
+// ✅ Upload de imagem (arquivo) + URL
+// ✅ Preview no topo do form
 
 const grid = document.querySelector("#cards-grid");
 const statusEl = document.querySelector("#status");
@@ -16,12 +15,22 @@ const deleteBtn = document.querySelector("#deleteBtn");
 
 const passModal = document.querySelector("#pass-modal");
 const passForm = document.querySelector("#pass-form");
+const passCancelBtn = document.querySelector("#passCancel");
+
+// Image UI
+const imageUrlEl = document.querySelector("#imageUrl");
+const imageFileEl = document.querySelector("#imageFile");
+const imgPreviewEl = document.querySelector("#imgPreview");
+const imgPlaceholderEl = document.querySelector("#imgPlaceholder");
 
 let allCards = [];
 let currentMode = "edit";
 let currentId = null;
 
 const PASS_KEY = "mrb_portal_admin_pass";
+
+// Controla “promessa” quando pedimos senha só no confirmar
+let passResolver = null;
 
 function setStatus(msg) { statusEl.textContent = msg || ""; }
 
@@ -44,13 +53,28 @@ function openPassModal() {
   input.value = "";
   setTimeout(() => input.focus(), 30);
 }
-function closePassModal() { passModal.setAttribute("aria-hidden", "true"); }
 
-function ensurePassOrPrompt() {
-  if (hasPass()) return true;
+function closePassModal() {
+  passModal.setAttribute("aria-hidden", "true");
+}
+
+// ✅ pede senha SOMENTE quando realmente precisa (salvar/excluir/upload)
+function requirePassConfirm() {
+  if (hasPass()) return Promise.resolve(true);
+
   openPassModal();
-  alert("Para alterar cards, informe a senha admin.");
-  return false;
+
+  return new Promise((resolve) => {
+    passResolver = resolve;
+  });
+}
+
+function resolvePass(ok) {
+  if (typeof passResolver === "function") {
+    const fn = passResolver;
+    passResolver = null;
+    fn(ok);
+  }
 }
 
 function openCardModal(mode, card) {
@@ -59,11 +83,16 @@ function openCardModal(mode, card) {
 
   cardModal.setAttribute("aria-hidden", "false");
 
+  // reset preview/file
+  imageFileEl.value = "";
+  setPreviewFromUrl("");
+
   if (mode === "create") {
     cardModalTitle.textContent = "Adicionar card";
     deleteBtn.style.display = "none";
     cardForm.reset();
     cardForm.elements.id.value = "";
+    setPreviewFromUrl("");
     return;
   }
 
@@ -74,9 +103,13 @@ function openCardModal(mode, card) {
   cardForm.elements.title.value = card.title ?? "";
   cardForm.elements.category.value = card.category ?? "";
   cardForm.elements.url.value = card.url ?? "";
-  cardForm.elements.image.value = card.image ?? "";
   cardForm.elements.description.value = card.description ?? "";
+
+  // imagem
+  imageUrlEl.value = card.image ?? "";
+  setPreviewFromUrl(card.image ?? "");
 }
+
 function closeCardModal() {
   cardModal.setAttribute("aria-hidden", "true");
   currentId = null;
@@ -87,6 +120,42 @@ function openCard(url) {
   window.open(url, "_blank", "noopener,noreferrer");
 }
 
+// --------- Preview ----------
+function setPreviewFromUrl(url) {
+  const clean = String(url || "").trim();
+
+  if (!clean) {
+    imgPreviewEl.style.display = "none";
+    imgPreviewEl.src = "";
+    imgPlaceholderEl.style.display = "block";
+    return;
+  }
+
+  imgPlaceholderEl.style.display = "none";
+  imgPreviewEl.style.display = "block";
+  imgPreviewEl.src = clean;
+}
+
+imageUrlEl.addEventListener("input", () => {
+  // se o cara colar URL, já mostra preview
+  setPreviewFromUrl(imageUrlEl.value);
+});
+
+// se escolher arquivo, mostra preview local e limpa URL (opcional)
+imageFileEl.addEventListener("change", () => {
+  const file = imageFileEl.files?.[0];
+  if (!file) return;
+
+  // preview local
+  const localUrl = URL.createObjectURL(file);
+  setPreviewFromUrl(localUrl);
+
+  // opcional: limpa o campo URL para evitar confusão
+  // (o upload terá prioridade no salvar)
+  // imageUrlEl.value = "";
+});
+
+// --------- Render ----------
 function cardHtml(c) {
   const title = escapeHtml(c.title);
   const category = escapeHtml(c.category || "");
@@ -131,12 +200,18 @@ function render(cards) {
   grid.insertAdjacentHTML("beforeend", addCardHtml());
 }
 
+// --------- API ----------
 async function api(path, opts = {}) {
   const pass = getPass();
-  const headers = { "Content-Type": "application/json", ...(opts.headers || {}) };
+  const headers = { ...(opts.headers || {}) };
 
   const method = String(opts.method || "GET").toUpperCase();
   const needsAuth = ["POST", "PUT", "PATCH", "DELETE"].includes(method);
+
+  // JSON default
+  if (!(opts.body instanceof FormData)) {
+    headers["Content-Type"] = "application/json";
+  }
 
   if (needsAuth && pass) headers["x-admin-password"] = pass;
 
@@ -171,13 +246,14 @@ function applyFilter() {
   render(filtered);
 }
 
+// --------- Actions ----------
 function openSettings(id) {
-  if (!ensurePassOrPrompt()) return;
+  // 🔒 aqui NÃO pede senha (config é só visual)
   const card = allCards.find((c) => String(c.id) === String(id));
   if (!card) return;
 
   alert(
-    `Configurações do card:\n\n` +
+    `Detalhes do card:\n\n` +
     `ID: ${card.id}\n` +
     `Título: ${card.title}\n` +
     `Categoria: ${card.category || "-"}\n` +
@@ -187,14 +263,12 @@ function openSettings(id) {
 }
 
 function openEditModal(id) {
-  if (!ensurePassOrPrompt()) return;
   const card = allCards.find((c) => String(c.id) === String(id));
   if (!card) return;
   openCardModal("edit", card);
 }
 
 function openCreateModal() {
-  if (!ensurePassOrPrompt()) return;
   openCardModal("create", null);
 }
 
@@ -203,7 +277,6 @@ grid.addEventListener("click", (e) => {
   const cardEl = e.target.closest(".card");
   if (!cardEl) return;
 
-  // botões do card
   if (actionBtn) {
     e.stopPropagation();
     const action = actionBtn.dataset.action;
@@ -214,10 +287,8 @@ grid.addEventListener("click", (e) => {
     return;
   }
 
-  // card + (add)
   if (cardEl.dataset.add === "1") return openCreateModal();
 
-  // card normal
   const url = cardEl.dataset.url;
   if (url) openCard(url);
 });
@@ -228,45 +299,92 @@ grid.addEventListener("keydown", (e) => {
   if (!cardEl) return;
 
   e.preventDefault();
-
   if (cardEl.dataset.add === "1") return openCreateModal();
 
   const url = cardEl.dataset.url;
   if (url) openCard(url);
 });
 
+// close modals
 document.addEventListener("click", (e) => {
   if (e.target.closest("#card-modal [data-close]")) closeCardModal();
-  if (e.target.closest("#pass-modal [data-close]")) closePassModal();
+  if (e.target.closest("#pass-modal [data-close]")) {
+    closePassModal();
+    resolvePass(false);
+  }
 });
 
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
   if (cardModal.getAttribute("aria-hidden") === "false") closeCardModal();
-  if (passModal.getAttribute("aria-hidden") === "false") closePassModal();
+  if (passModal.getAttribute("aria-hidden") === "false") {
+    closePassModal();
+    resolvePass(false);
+  }
 });
 
 adminBtn.addEventListener("click", () => openPassModal());
 searchEl.addEventListener("input", applyFilter);
 
+// senha modal submit (confirma)
 passForm.addEventListener("submit", (e) => {
   e.preventDefault();
   const p = passForm.elements.password.value || "";
   setPass(p);
   closePassModal();
-  alert(p ? "Senha salva nesta sessão." : "Senha removida desta sessão.");
+  resolvePass(!!p);
 });
 
+// botão cancelar no modal senha
+passCancelBtn.addEventListener("click", (e) => {
+  e.preventDefault();
+  closePassModal();
+  resolvePass(false);
+});
+
+// --------- Upload helper ----------
+async function uploadSelectedImageIfAny() {
+  const file = imageFileEl.files?.[0];
+  if (!file) return null;
+
+  // pede senha apenas aqui (porque vai alterar)
+  const ok = await requirePassConfirm();
+  if (!ok) return null;
+
+  const fd = new FormData();
+  fd.append("file", file);
+
+  const result = await api("/api/upload", { method: "POST", body: fd });
+  // result = { url: "/uploads/....png" }
+  return result.url;
+}
+
+// Save card (create/edit) — ✅ senha só aqui
 cardForm.addEventListener("submit", async (e) => {
   e.preventDefault();
+
   try {
-    if (!ensurePassOrPrompt()) return;
+    // 1) Se tem arquivo, faz upload (isso já pede senha)
+    let imageUrl = null;
+    const uploadedUrl = await uploadSelectedImageIfAny();
+    if (uploadedUrl) {
+      imageUrl = uploadedUrl;
+      imageUrlEl.value = uploadedUrl;
+      setPreviewFromUrl(uploadedUrl);
+    } else {
+      // 2) Sem upload, usa URL digitada
+      imageUrl = (imageUrlEl.value || "").trim();
+    }
+
+    // 3) Agora sim pede senha para salvar (se ainda não tiver)
+    const ok = await requirePassConfirm();
+    if (!ok) return;
 
     const payload = {
       title: cardForm.elements.title.value,
       category: cardForm.elements.category.value,
       url: cardForm.elements.url.value,
-      image: cardForm.elements.image.value,
+      image: imageUrl,
       description: cardForm.elements.description.value,
     };
 
@@ -287,14 +405,16 @@ cardForm.addEventListener("submit", async (e) => {
   }
 });
 
+// Delete — ✅ senha só aqui
 deleteBtn.addEventListener("click", async () => {
   try {
-    if (!ensurePassOrPrompt()) return;
-
     const id = currentId || cardForm.elements.id.value;
     if (!id) return;
 
     if (!confirm("Tem certeza que deseja excluir este card?")) return;
+
+    const ok = await requirePassConfirm();
+    if (!ok) return;
 
     await api(`/api/cards/${encodeURIComponent(id)}`, { method: "DELETE" });
 
@@ -305,4 +425,5 @@ deleteBtn.addEventListener("click", async () => {
   }
 });
 
+// Boot
 load();
