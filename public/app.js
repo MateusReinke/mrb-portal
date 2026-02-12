@@ -1,33 +1,23 @@
-// public/app.js
-// ✅ Card inteiro clicável
-// ✅ Botões (⚙️ / ✏️) não abrem o link
-// ✅ Add Card
-// 🔐 Para criar/editar/excluir: pede senha (salva na sessionStorage)
-
 const grid = document.querySelector("#cards-grid");
 const statusEl = document.querySelector("#status");
 const searchEl = document.querySelector("#search");
 const adminBtn = document.querySelector("#adminBtn");
 
-// Modal card
 const cardModal = document.querySelector("#card-modal");
 const cardModalTitle = document.querySelector("#modal-title");
 const cardForm = document.querySelector("#card-form");
 const deleteBtn = document.querySelector("#deleteBtn");
 
-// Modal senha
 const passModal = document.querySelector("#pass-modal");
 const passForm = document.querySelector("#pass-form");
 
 let allCards = [];
-let currentMode = "edit"; // edit | create
+let currentMode = "edit";
 let currentId = null;
 
-const PASS_KEY = "mrb_portal_admin_pass"; // sessionStorage
+const PASS_KEY = "mrb_portal_admin_pass";
 
-function setStatus(msg) {
-  statusEl.textContent = msg || "";
-}
+function setStatus(msg) { statusEl.textContent = msg || ""; }
 
 function escapeHtml(str) {
   return String(str ?? "")
@@ -38,25 +28,9 @@ function escapeHtml(str) {
     .replaceAll("'", "&#039;");
 }
 
-function getPass() {
-  return sessionStorage.getItem(PASS_KEY) || "";
-}
-
-function setPass(p) {
-  sessionStorage.setItem(PASS_KEY, String(p || ""));
-}
-
-function hasPass() {
-  return !!getPass();
-}
-
-function ensurePassOrPrompt() {
-  if (hasPass()) return true;
-
-  openPassModal();
-  alert("Para alterar cards, informe a senha admin.");
-  return false;
-}
+function getPass() { return sessionStorage.getItem(PASS_KEY) || ""; }
+function setPass(p) { sessionStorage.setItem(PASS_KEY, String(p || "")); }
+function hasPass() { return !!getPass(); }
 
 function openPassModal() {
   passModal.setAttribute("aria-hidden", "false");
@@ -64,9 +38,13 @@ function openPassModal() {
   input.value = "";
   setTimeout(() => input.focus(), 30);
 }
+function closePassModal() { passModal.setAttribute("aria-hidden", "true"); }
 
-function closePassModal() {
-  passModal.setAttribute("aria-hidden", "true");
+function ensurePassOrPrompt() {
+  if (hasPass()) return true;
+  openPassModal();
+  alert("Para alterar cards, informe a senha admin.");
+  return false;
 }
 
 function openCardModal(mode, card) {
@@ -93,7 +71,6 @@ function openCardModal(mode, card) {
   cardForm.elements.image.value = card.image ?? "";
   cardForm.elements.description.value = card.description ?? "";
 }
-
 function closeCardModal() {
   cardModal.setAttribute("aria-hidden", "true");
   currentId = null;
@@ -167,23 +144,17 @@ async function api(path, opts = {}) {
   const pass = getPass();
   const headers = { "Content-Type": "application/json", ...(opts.headers || {}) };
 
-  // Só envia senha em operações mutáveis
   const method = String(opts.method || "GET").toUpperCase();
   const needsAuth = ["POST", "PUT", "PATCH", "DELETE"].includes(method);
 
-  if (needsAuth && pass) {
-    headers["x-admin-password"] = pass;
-  }
+  if (needsAuth && pass) headers["x-admin-password"] = pass;
 
   const res = await fetch(path, { ...opts, headers });
 
   const isJson = (res.headers.get("content-type") || "").includes("application/json");
   const body = isJson ? await res.json() : await res.text();
 
-  if (!res.ok) {
-    const msg = body?.error || `Erro HTTP ${res.status}`;
-    throw new Error(msg);
-  }
+  if (!res.ok) throw new Error(body?.error || `Erro HTTP ${res.status}`);
   return body;
 }
 
@@ -211,13 +182,10 @@ function applyFilter() {
 }
 
 function openSettings(id) {
-  // 🔐 configurações também pedem senha (você pode trocar isso depois)
   if (!ensurePassOrPrompt()) return;
-
   const card = allCards.find((c) => String(c.id) === String(id));
   if (!card) return;
 
-  // Placeholder: hoje só mostra info. Você pode evoluir depois.
   alert(
     `Configurações do card:\n\n` +
     `ID: ${card.id}\n` +
@@ -230,7 +198,6 @@ function openSettings(id) {
 
 function openEditModal(id) {
   if (!ensurePassOrPrompt()) return;
-
   const card = allCards.find((c) => String(c.id) === String(id));
   if (!card) return;
   openCardModal("edit", card);
@@ -241,7 +208,6 @@ function openCreateModal() {
   openCardModal("create", null);
 }
 
-// Grid events
 grid.addEventListener("click", (e) => {
   const actionBtn = e.target.closest("[data-action]");
   const cardEl = e.target.closest(".card");
@@ -258,13 +224,12 @@ grid.addEventListener("click", (e) => {
     return;
   }
 
-  // clicou em qualquer parte do card -> abre o link (menos o card add)
   if (cardEl.classList.contains("card--add")) return openCreateModal();
+
   const url = cardEl.dataset.url;
   if (url) openCard(url);
 });
 
-// Keyboard open
 grid.addEventListener("keydown", (e) => {
   if (e.key !== "Enter" && e.key !== " ") return;
   const cardEl = e.target.closest(".card");
@@ -277,26 +242,20 @@ grid.addEventListener("keydown", (e) => {
   if (url) openCard(url);
 });
 
-// Close modals by clicking close/backdrop
 document.addEventListener("click", (e) => {
   if (e.target.closest("#card-modal [data-close]")) closeCardModal();
   if (e.target.closest("#pass-modal [data-close]")) closePassModal();
 });
 
-// ESC closes
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
   if (cardModal.getAttribute("aria-hidden") === "false") closeCardModal();
   if (passModal.getAttribute("aria-hidden") === "false") closePassModal();
 });
 
-// Admin button (senha)
-adminBtn.addEventListener("click", () => {
-  openPassModal();
-});
+adminBtn.addEventListener("click", () => openPassModal());
 
-// Save password
-passForm.addEventListener("submit", async (e) => {
+passForm.addEventListener("submit", (e) => {
   e.preventDefault();
   const p = passForm.elements.password.value || "";
   setPass(p);
@@ -304,7 +263,6 @@ passForm.addEventListener("submit", async (e) => {
   alert(p ? "Senha salva nesta sessão." : "Senha removida desta sessão.");
 });
 
-// Save card (create/edit)
 cardForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   try {
@@ -335,7 +293,6 @@ cardForm.addEventListener("submit", async (e) => {
   }
 });
 
-// Delete card
 deleteBtn.addEventListener("click", async () => {
   try {
     if (!ensurePassOrPrompt()) return;
@@ -343,8 +300,7 @@ deleteBtn.addEventListener("click", async () => {
     const id = currentId || cardForm.elements.id.value;
     if (!id) return;
 
-    const ok = confirm("Tem certeza que deseja excluir este card?");
-    if (!ok) return;
+    if (!confirm("Tem certeza que deseja excluir este card?")) return;
 
     await api(`/api/cards/${encodeURIComponent(id)}`, { method: "DELETE" });
 
@@ -355,8 +311,6 @@ deleteBtn.addEventListener("click", async () => {
   }
 });
 
-// Search
 searchEl.addEventListener("input", applyFilter);
 
-// Boot
 load();

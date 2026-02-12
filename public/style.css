@@ -1,4 +1,3 @@
-/* public/styles.css */
 :root{
   --max: 1100px;
   --gap: 14px;
@@ -146,7 +145,7 @@ body{
   display: flex;
   gap: 12px;
   align-items: center;
-  padding-right: 84px; /* espaço pros botões */
+  padding-right: 84px;
 }
 
 .card__img{
@@ -172,9 +171,7 @@ body{
   min-height: 18px;
 }
 
-.card__meta{
-  margin-top: 2px;
-}
+.card__meta{ margin-top: 2px; }
 
 .pill{
   display: inline-flex;
@@ -222,17 +219,12 @@ body{
   background: rgba(80,120,255,.18);
 }
 .btn--primary:hover{ background: rgba(80,120,255,.26); }
-
-.btn--ghost{
-  background: rgba(0,0,0,.14);
-}
-
+.btn--ghost{ background: rgba(0,0,0,.14); }
 .btn--danger{
   border-color: rgba(255,80,80,.35);
   background: rgba(255,80,80,.12);
 }
 .btn--danger:hover{ background: rgba(255,80,80,.18); }
-
 .spacer{ flex: 1; }
 
 .hint{
@@ -313,14 +305,7 @@ body{
 }
 
 @media (max-width: 720px){
-  .topbar{
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .topbar__right{
-    justify-content: stretch;
-  }
-  .search{
-    width: 100%;
-  }
+  .topbar{ flex-direction: column; align-items: stretch; }
+  .topbar__right{ justify-content: stretch; }
+  .search{ width: 100%; }
 }
