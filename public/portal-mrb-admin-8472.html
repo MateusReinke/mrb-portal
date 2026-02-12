@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Admin - Portal MRB</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<h2>Área Administrativa</h2>
+
+<div id="loginBox" class="form-box">
+  <input type="password" id="password" placeholder="Senha">
+  <button class="btn-primary" onclick="login()">Entrar</button>
+</div>
+
+<div id="adminArea" style="display:none;">
+
+  <div style="text-align:center;">
+    <button onclick="goHome()">🏠 Voltar para Home</button>
+  </div>
+
+  <div class="form-box">
+    <h3>Novo / Editar Card</h3>
+    <input id="title" placeholder="Título"><br>
+    <input id="category" placeholder="Categoria"><br>
+    <input id="url" placeholder="URL"><br>
+    <input id="image" placeholder="URL da Imagem"><br>
+    <button class="btn-primary" onclick="saveCard()">Salvar</button>
+  </div>
+
+  <h3 style="text-align:center;">Cards Cadastrados</h3>
+  <div id="cards"></div>
+
+</div>
+
+<script>
+let token = null;
+let cardsData = [];
+let editId = null;
+
+async function login(){
+  const password = document.getElementById("password").value;
+  const res = await fetch('/login',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({password})
+  });
+  if(!res.ok){ alert("Senha incorreta"); return; }
+
+  const data = await res.json();
+  token = data.token;
+
+  document.getElementById("loginBox").style.display="none";
+  document.getElementById("adminArea").style.display="block";
+
+  loadCards();
+}
+
+function goHome(){
+  window.location.href="/";
+}
+
+async function loadCards(){
+  const res = await fetch('/cards');
+  cardsData = await res.json();
+  renderCards();
+}
+
+function renderCards(){
+  const container = document.getElementById("cards");
+  container.innerHTML="";
+
+  cardsData.forEach(card=>{
+    container.innerHTML += `
+      <div class="card">
+        <img src="${card.image}">
+        <h4>${card.title}</h4>
+        <p>${card.category}</p>
+        <button onclick="editCard(${card.id})">Editar</button>
+        <button class="btn-danger" onclick="deleteCard(${card.id})">Excluir</button>
+      </div>
+    `;
+  });
+}
+
+function editCard(id){
+  const card = cardsData.find(c=>c.id===id);
+  editId = id;
+  document.getElementById("title").value = card.title;
+  document.getElementById("category").value = card.category;
+  document.getElementById("url").value = card.url;
+  document.getElementById("image").value = card.image;
+}
+
+async function saveCard(){
+  const title = document.getElementById("title").value;
+  const category = document.getElementById("category").value;
+  const url = document.getElementById("url").value;
+  const image = document.getElementById("image").value;
+
+  if(editId){
+    const card = cardsData.find(c=>c.id===editId);
+    card.title=title;
+    card.category=category;
+    card.url=url;
+    card.image=image;
+  } else {
+    cardsData.push({
+      id: Date.now(),
+      title,
+      category,
+      url,
+      image
+    });
+  }
+
+  await fetch('/cards',{
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'Authorization':token
+    },
+    body:JSON.stringify(cardsData)
+  });
+
+  editId=null;
+  document.getElementById("title").value="";
+  document.getElementById("category").value="";
+  document.getElementById("url").value="";
+  document.getElementById("image").value="";
+
+  loadCards();
+}
+
+async function deleteCard(id){
+  cardsData = cardsData.filter(c=>c.id!==id);
+
+  await fetch('/cards',{
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'Authorization':token
+    },
+    body:JSON.stringify(cardsData)
+  });
+
+  loadCards();
+}
+</script>
+
+</body>
+</html>

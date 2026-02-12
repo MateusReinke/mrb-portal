@@ -43,14 +43,14 @@ if (!fs.readFileSync(dataFile).toString()) {
       title: "Evolution",
       category: "WhatsApp API",
       url: "https://evolution.mrbautomacoes.site",
-      image: "https://evolution.mrbautomacoes.site/manager/login"
+      image: "URL_IMAGEM_VALIDA_AQUI"
     },
     {
       id: 5,
       title: "Chatwoot",
       category: "Atendimento",
       url: "https://chatwoot.mrbautomacoes.site",
-      image: "https://cache.promovaweb.com/category-thumb/63ad73…72683831-1e71c500-3b01-11ea-8dc0-a4afc6f5df35.png"
+      image: "URL_IMAGEM_VALIDA_AQUI"
     },
     {
       id: 6,
@@ -59,7 +59,7 @@ if (!fs.readFileSync(dataFile).toString()) {
       url: "https://coolify.mrbautomacoes.site",
       image: "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/coolify.png"
     }
-  ], { spaces: 6 });
+  ], { spaces: 2 });
 }
 
 function auth(req, res, next){
@@ -89,5 +89,10 @@ app.post('/cards', auth, async(req,res)=>{
   await fs.writeJson(dataFile, req.body, {spaces:2});
   res.json({success:true});
 });
+// ROTA ADMIN INVISÍVEL
+app.get('/portal-mrb-admin-8472.html', (req,res)=>{
+  res.sendFile(path.join(__dirname,'public','portal-mrb-admin-8472.html'));
+});
 
+// START SERVER
 app.listen(PORT, ()=> console.log("Rodando na porta "+PORT));

@@ -5,13 +5,19 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>Portal MRB 🚀</h1>
-  <div id="cards"></div>
 
-  <div class="admin-link">
-    <a href="/admin.html">⚙️ Área Admin</a>
+<header>
+  <h1>Portal MRB</h1>
+
+  <div class="controls">
+    <input type="text" id="search" placeholder="Buscar...">
+    <select id="categoryFilter"></select>
+    <button onclick="toggleTheme()">🌙</button>
   </div>
+</header>
 
-  <script src="app.js"></script>
+<div id="cards"></div>
+
+<script src="app.js"></script>
 </body>
 </html>
