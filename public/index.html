@@ -1,0 +1,94 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Portal MRB Automações</title>
+<style>
+body{background:#0f172a;color:white;font-family:Arial;text-align:center}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:20px;padding:40px}
+.card{background:#1e293b;padding:20px;border-radius:12px}
+input,button{padding:8px;margin:5px;border-radius:6px;border:none}
+</style>
+</head>
+<body>
+
+<h1>Portal MRB Automações</h1>
+
+<div id="loginBox">
+  <input type="password" id="password" placeholder="Senha admin">
+  <button onclick="login()">Entrar</button>
+</div>
+
+<button onclick="addCard()" id="addBtn" style="display:none">Adicionar Card</button>
+
+<div class="grid" id="grid"></div>
+
+<script>
+let token = null;
+
+async function login(){
+  const password = document.getElementById('password').value;
+  const res = await fetch('/api/login',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({password})
+  });
+  if(res.ok){
+    const data = await res.json();
+    token = data.token;
+    document.getElementById('loginBox').style.display='none';
+    document.getElementById('addBtn').style.display='inline-block';
+    load();
+  } else {
+    alert('Senha incorreta');
+  }
+}
+
+async function load(){
+  const res = await fetch('/api/cards');
+  const cards = await res.json();
+  const grid = document.getElementById('grid');
+  grid.innerHTML='';
+  cards.forEach(card=>{
+    grid.innerHTML+=`
+      <div class="card">
+        <img src="${card.img}" width="50"><br>
+        <b>${card.name}</b><br>
+        ${card.desc}<br>
+        <button onclick="window.open('${card.url}')">Abrir</button>
+        ${token ? `<button onclick="deleteCard(${card.id})">Excluir</button>`:''}
+      </div>
+    `;
+  });
+}
+
+async function addCard(){
+  const name = prompt("Nome:");
+  const desc = prompt("Descrição:");
+  const url = prompt("URL:");
+  const img = prompt("URL imagem:");
+  await fetch('/api/cards',{
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'Authorization':'Bearer '+token
+    },
+    body:JSON.stringify({name,desc,url,img})
+  });
+  load();
+}
+
+async function deleteCard(id){
+  await fetch('/api/cards/'+id,{
+    method:'DELETE',
+    headers:{'Authorization':'Bearer '+token}
+  });
+  load();
+}
+
+load();
+</script>
+
+</body>
+</html>

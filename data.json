@@ -1,0 +1,11 @@
+{
+  "cards": [
+    {
+      "id": 1,
+      "name": "n8n",
+      "desc": "Automa\u00e7\u00f5es",
+      "url": "https://n8n.mrbautomacoes.site",
+      "img": "https://registry.npmmirror.com/@lobehub/icons-static-png/latest/files/dark/n8n-color.png"
+    }
+  ]
+}
