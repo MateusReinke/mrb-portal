@@ -2,92 +2,75 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
-<title>Portal MRB Automações</title>
-<style>
-body{background:#0f172a;color:white;font-family:Arial;text-align:center}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:20px;padding:40px}
-.card{background:#1e293b;padding:20px;border-radius:12px}
-input,button{padding:8px;margin:5px;border-radius:6px;border:none}
-</style>
+    <meta charset="UTF-8">
+    <title>Portal MRB</title>
+    <style>
+        body { font-family: Arial; margin: 40px; background: #111; color: white; }
+        textarea { width: 100%; height: 200px; margin-top: 10px; }
+        button { padding: 10px; margin-top: 10px; cursor: pointer; }
+        #loginBox { margin-bottom: 20px; }
+    </style>
 </head>
 <body>
 
-<h1>Portal MRB Automações</h1>
+<h1>Portal MRB</h1>
 
 <div id="loginBox">
-  <input type="password" id="password" placeholder="Senha admin">
-  <button onclick="login()">Entrar</button>
+    <input type="password" id="password" placeholder="Senha admin">
+    <button onclick="login()">Login</button>
 </div>
 
-<button onclick="addCard()" id="addBtn" style="display:none">Adicionar Card</button>
+<div id="editor" style="display:none;">
+    <textarea id="content"></textarea><br>
+    <button onclick="save()">Salvar</button>
+</div>
 
-<div class="grid" id="grid"></div>
+<div id="viewer"></div>
 
 <script>
 let token = null;
 
-async function login(){
-  const password = document.getElementById('password').value;
-  const res = await fetch('/api/login',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({password})
-  });
-  if(res.ok){
+async function login() {
+    const password = document.getElementById("password").value;
+    const res = await fetch("/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password })
+    });
+
+    if (!res.ok) return alert("Senha incorreta");
+
     const data = await res.json();
     token = data.token;
-    document.getElementById('loginBox').style.display='none';
-    document.getElementById('addBtn').style.display='inline-block';
-    load();
-  } else {
-    alert('Senha incorreta');
-  }
+
+    document.getElementById("loginBox").style.display = "none";
+    document.getElementById("editor").style.display = "block";
 }
 
-async function load(){
-  const res = await fetch('/api/cards');
-  const cards = await res.json();
-  const grid = document.getElementById('grid');
-  grid.innerHTML='';
-  cards.forEach(card=>{
-    grid.innerHTML+=`
-      <div class="card">
-        <img src="${card.img}" width="50"><br>
-        <b>${card.name}</b><br>
-        ${card.desc}<br>
-        <button onclick="window.open('${card.url}')">Abrir</button>
-        ${token ? `<button onclick="deleteCard(${card.id})">Excluir</button>`:''}
-      </div>
-    `;
-  });
+async function loadContent() {
+    const res = await fetch("/content");
+    const data = await res.json();
+    document.getElementById("viewer").innerHTML = "<h2>Conteúdo Atual:</h2>" + data.content;
+    document.getElementById("content").value = data.content;
 }
 
-async function addCard(){
-  const name = prompt("Nome:");
-  const desc = prompt("Descrição:");
-  const url = prompt("URL:");
-  const img = prompt("URL imagem:");
-  await fetch('/api/cards',{
-    method:'POST',
-    headers:{
-      'Content-Type':'application/json',
-      'Authorization':'Bearer '+token
-    },
-    body:JSON.stringify({name,desc,url,img})
-  });
-  load();
+async function save() {
+    await fetch("/content", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": token
+        },
+        body: JSON.stringify({
+            content: document.getElementById("content").value
+        })
+    });
+
+    alert("Salvo com sucesso!");
+    loadContent();
 }
 
-async function deleteCard(id){
-  await fetch('/api/cards/'+id,{
-    method:'DELETE',
-    headers:{'Authorization':'Bearer '+token}
-  });
-  load();
-}
-
-load();
+loadContent();
 </script>
 
 </body>
