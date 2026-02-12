@@ -1,8 +1,3 @@
-// public/app.js (COMPLETO)
-// ✅ Senha só é pedida ao SALVAR/EXCLUIR/UPLOAD
-// ✅ Upload de imagem (arquivo) + URL
-// ✅ Preview no topo do form
-
 const grid = document.querySelector("#cards-grid");
 const statusEl = document.querySelector("#status");
 const searchEl = document.querySelector("#search");
@@ -17,7 +12,6 @@ const passModal = document.querySelector("#pass-modal");
 const passForm = document.querySelector("#pass-form");
 const passCancelBtn = document.querySelector("#passCancel");
 
-// Image UI
 const imageUrlEl = document.querySelector("#imageUrl");
 const imageFileEl = document.querySelector("#imageFile");
 const imgPreviewEl = document.querySelector("#imgPreview");
@@ -28,8 +22,6 @@ let currentMode = "edit";
 let currentId = null;
 
 const PASS_KEY = "mrb_portal_admin_pass";
-
-// Controla “promessa” quando pedimos senha só no confirmar
 let passResolver = null;
 
 function setStatus(msg) { statusEl.textContent = msg || ""; }
@@ -53,22 +45,13 @@ function openPassModal() {
   input.value = "";
   setTimeout(() => input.focus(), 30);
 }
+function closePassModal() { passModal.setAttribute("aria-hidden", "true"); }
 
-function closePassModal() {
-  passModal.setAttribute("aria-hidden", "true");
-}
-
-// ✅ pede senha SOMENTE quando realmente precisa (salvar/excluir/upload)
 function requirePassConfirm() {
   if (hasPass()) return Promise.resolve(true);
-
   openPassModal();
-
-  return new Promise((resolve) => {
-    passResolver = resolve;
-  });
+  return new Promise((resolve) => { passResolver = resolve; });
 }
-
 function resolvePass(ok) {
   if (typeof passResolver === "function") {
     const fn = passResolver;
@@ -77,13 +60,36 @@ function resolvePass(ok) {
   }
 }
 
+// preview
+function setPreviewFromUrl(url) {
+  const clean = String(url || "").trim();
+  if (!clean) {
+    imgPreviewEl.style.display = "none";
+    imgPreviewEl.src = "";
+    imgPlaceholderEl.style.display = "block";
+    return;
+  }
+  imgPlaceholderEl.style.display = "none";
+  imgPreviewEl.style.display = "block";
+  imgPreviewEl.src = clean;
+}
+
+imageUrlEl.addEventListener("input", () => setPreviewFromUrl(imageUrlEl.value));
+
+imageFileEl.addEventListener("change", () => {
+  const file = imageFileEl.files?.[0];
+  if (!file) return;
+  const localUrl = URL.createObjectURL(file);
+  setPreviewFromUrl(localUrl);
+});
+
+// modal
 function openCardModal(mode, card) {
   currentMode = mode;
   currentId = card?.id || null;
 
   cardModal.setAttribute("aria-hidden", "false");
 
-  // reset preview/file
   imageFileEl.value = "";
   setPreviewFromUrl("");
 
@@ -92,7 +98,7 @@ function openCardModal(mode, card) {
     deleteBtn.style.display = "none";
     cardForm.reset();
     cardForm.elements.id.value = "";
-    setPreviewFromUrl("");
+    imageUrlEl.value = "";
     return;
   }
 
@@ -105,7 +111,6 @@ function openCardModal(mode, card) {
   cardForm.elements.url.value = card.url ?? "";
   cardForm.elements.description.value = card.description ?? "";
 
-  // imagem
   imageUrlEl.value = card.image ?? "";
   setPreviewFromUrl(card.image ?? "");
 }
@@ -120,42 +125,6 @@ function openCard(url) {
   window.open(url, "_blank", "noopener,noreferrer");
 }
 
-// --------- Preview ----------
-function setPreviewFromUrl(url) {
-  const clean = String(url || "").trim();
-
-  if (!clean) {
-    imgPreviewEl.style.display = "none";
-    imgPreviewEl.src = "";
-    imgPlaceholderEl.style.display = "block";
-    return;
-  }
-
-  imgPlaceholderEl.style.display = "none";
-  imgPreviewEl.style.display = "block";
-  imgPreviewEl.src = clean;
-}
-
-imageUrlEl.addEventListener("input", () => {
-  // se o cara colar URL, já mostra preview
-  setPreviewFromUrl(imageUrlEl.value);
-});
-
-// se escolher arquivo, mostra preview local e limpa URL (opcional)
-imageFileEl.addEventListener("change", () => {
-  const file = imageFileEl.files?.[0];
-  if (!file) return;
-
-  // preview local
-  const localUrl = URL.createObjectURL(file);
-  setPreviewFromUrl(localUrl);
-
-  // opcional: limpa o campo URL para evitar confusão
-  // (o upload terá prioridade no salvar)
-  // imageUrlEl.value = "";
-});
-
-// --------- Render ----------
 function cardHtml(c) {
   const title = escapeHtml(c.title);
   const category = escapeHtml(c.category || "");
@@ -200,25 +169,19 @@ function render(cards) {
   grid.insertAdjacentHTML("beforeend", addCardHtml());
 }
 
-// --------- API ----------
 async function api(path, opts = {}) {
   const pass = getPass();
   const headers = { ...(opts.headers || {}) };
 
   const method = String(opts.method || "GET").toUpperCase();
-  const needsAuth = ["POST", "PUT", "PATCH", "DELETE"].includes(method);
+  const needsAuth = ["POST","PUT","PATCH","DELETE"].includes(method);
 
-  // JSON default
-  if (!(opts.body instanceof FormData)) {
-    headers["Content-Type"] = "application/json";
-  }
-
+  if (!(opts.body instanceof FormData)) headers["Content-Type"] = "application/json";
   if (needsAuth && pass) headers["x-admin-password"] = pass;
 
   const res = await fetch(path, { ...opts, headers });
   const isJson = (res.headers.get("content-type") || "").includes("application/json");
   const body = isJson ? await res.json() : await res.text();
-
   if (!res.ok) throw new Error(body?.error || `Erro HTTP ${res.status}`);
   return body;
 }
@@ -246,12 +209,9 @@ function applyFilter() {
   render(filtered);
 }
 
-// --------- Actions ----------
 function openSettings(id) {
-  // 🔒 aqui NÃO pede senha (config é só visual)
   const card = allCards.find((c) => String(c.id) === String(id));
   if (!card) return;
-
   alert(
     `Detalhes do card:\n\n` +
     `ID: ${card.id}\n` +
@@ -272,6 +232,7 @@ function openCreateModal() {
   openCardModal("create", null);
 }
 
+// grid events
 grid.addEventListener("click", (e) => {
   const actionBtn = e.target.closest("[data-action]");
   const cardEl = e.target.closest(".card");
@@ -326,7 +287,7 @@ document.addEventListener("keydown", (e) => {
 adminBtn.addEventListener("click", () => openPassModal());
 searchEl.addEventListener("input", applyFilter);
 
-// senha modal submit (confirma)
+// pass modal submit
 passForm.addEventListener("submit", (e) => {
   e.preventDefault();
   const p = passForm.elements.password.value || "";
@@ -334,20 +295,17 @@ passForm.addEventListener("submit", (e) => {
   closePassModal();
   resolvePass(!!p);
 });
-
-// botão cancelar no modal senha
 passCancelBtn.addEventListener("click", (e) => {
   e.preventDefault();
   closePassModal();
   resolvePass(false);
 });
 
-// --------- Upload helper ----------
+// upload helper
 async function uploadSelectedImageIfAny() {
   const file = imageFileEl.files?.[0];
   if (!file) return null;
 
-  // pede senha apenas aqui (porque vai alterar)
   const ok = await requirePassConfirm();
   if (!ok) return null;
 
@@ -355,28 +313,23 @@ async function uploadSelectedImageIfAny() {
   fd.append("file", file);
 
   const result = await api("/api/upload", { method: "POST", body: fd });
-  // result = { url: "/uploads/....png" }
   return result.url;
 }
 
-// Save card (create/edit) — ✅ senha só aqui
+// save (create/edit) — senha só aqui
 cardForm.addEventListener("submit", async (e) => {
   e.preventDefault();
-
   try {
-    // 1) Se tem arquivo, faz upload (isso já pede senha)
-    let imageUrl = null;
+    // 1) upload se tiver arquivo
     const uploadedUrl = await uploadSelectedImageIfAny();
+    let imageUrl = uploadedUrl || (imageUrlEl.value || "").trim();
+
     if (uploadedUrl) {
-      imageUrl = uploadedUrl;
       imageUrlEl.value = uploadedUrl;
       setPreviewFromUrl(uploadedUrl);
-    } else {
-      // 2) Sem upload, usa URL digitada
-      imageUrl = (imageUrlEl.value || "").trim();
     }
 
-    // 3) Agora sim pede senha para salvar (se ainda não tiver)
+    // 2) pede senha pra salvar (se ainda não tiver)
     const ok = await requirePassConfirm();
     if (!ok) return;
 
@@ -405,7 +358,7 @@ cardForm.addEventListener("submit", async (e) => {
   }
 });
 
-// Delete — ✅ senha só aqui
+// delete — senha só aqui
 deleteBtn.addEventListener("click", async () => {
   try {
     const id = currentId || cardForm.elements.id.value;
@@ -425,5 +378,4 @@ deleteBtn.addEventListener("click", async () => {
   }
 });
 
-// Boot
 load();

@@ -1,190 +1,124 @@
-// server.js (COMPLETO)
-// ✅ Lê/Salva cards em: ./data/data.json (ARRAY)
-// ✅ Static em: ./public
-// ✅ Upload de imagem em: ./public/uploads (protegido por senha)
-// ✅ CRUD protegido por senha (ADMIN_PASSWORD)
-// ✅ Porta: 8088 (ou env PORT)
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Portal MRB Automações</title>
+  <link rel="stylesheet" href="/style.css?v=8088" />
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <h1 class="hero__title">Portal MRB Automações</h1>
+      <p class="hero__subtitle">Central de aplicações • Infraestrutura privada</p>
 
-const express = require("express");
-const path = require("path");
-const fs = require("fs");
-const multer = require("multer");
+      <div class="hero__controls">
+        <input id="search" class="search" placeholder="Buscar..." />
+        <button id="adminBtn" class="btn btn--ghost" type="button">Senha admin</button>
+      </div>
+    </header>
 
-const app = express();
-const PORT = Number(process.env.PORT || 8088);
-const ADMIN_PASSWORD = String(process.env.ADMIN_PASSWORD || "1537");
+    <section class="wrap">
+      <section id="cards-grid" class="grid" aria-label="Cards"></section>
+      <div class="footer">
+        <span id="status" class="status"></span>
+      </div>
+    </section>
+  </main>
 
-const DATA_FILE = path.join(__dirname, "data", "data.json");
-const PUBLIC_DIR = path.join(__dirname, "public");
-const UPLOAD_DIR = path.join(PUBLIC_DIR, "uploads");
+  <!-- Modal (criar/editar) -->
+  <div id="card-modal" class="modal" aria-hidden="true">
+    <div class="modal__backdrop" data-close="1"></div>
 
-app.use(express.json({ limit: "5mb" }));
+    <div class="modal__panel" role="dialog" aria-modal="true" aria-label="Card">
+      <header class="modal__header">
+        <h2 id="modal-title" class="modal__title">Editar card</h2>
+        <button class="icon-btn" data-close="1" aria-label="Fechar">✕</button>
+      </header>
 
-// ✅ garante pastas
-function ensureDir(dir) {
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-}
-ensureDir(path.dirname(DATA_FILE));
-ensureDir(UPLOAD_DIR);
+      <form id="card-form" class="modal__form">
+        <input type="hidden" name="id" />
 
-// ✅ serve public
-app.use(express.static(PUBLIC_DIR));
-// ✅ (opcional) explicitar uploads
-app.use("/uploads", express.static(UPLOAD_DIR));
+        <!-- ✅ PREVIEW + UPLOAD no TOPO -->
+        <section class="imageBox">
+          <div class="imageBox__preview">
+            <img id="imgPreview" alt="" />
+            <div id="imgPlaceholder" class="imageBox__placeholder">Prévia da imagem</div>
+          </div>
 
-// ---------- Helpers ----------
-function ensureDataFile() {
-  if (!fs.existsSync(DATA_FILE)) {
-    fs.writeFileSync(DATA_FILE, JSON.stringify([], null, 2), "utf-8");
-  }
-}
+          <div class="imageBox__controls">
+            <label class="field">
+              <span>Imagem (URL)</span>
+              <input id="imageUrl" name="image" placeholder="https://...png ou /uploads/arquivo.png" />
+            </label>
 
-function readCards() {
-  ensureDataFile();
-  const raw = fs.readFileSync(DATA_FILE, "utf-8").trim();
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
+            <label class="field">
+              <span>Ou enviar arquivo</span>
+              <input id="imageFile" type="file" accept="image/*" />
+            </label>
 
-function writeCards(cards) {
-  ensureDataFile();
-  fs.writeFileSync(DATA_FILE, JSON.stringify(cards, null, 2), "utf-8");
-}
+            <p class="hint mini">
+              Ao salvar, se você escolher arquivo, ele será enviado e usado no card.
+            </p>
+          </div>
+        </section>
 
-function normalizeCard(input) {
-  const title = String(input.title ?? "").trim();
-  const category = String(input.category ?? "").trim();
-  const url = String(input.url ?? "").trim();
-  const image = String(input.image ?? "").trim();
-  const description = String(input.description ?? "").trim();
+        <label class="field">
+          <span>Título</span>
+          <input name="title" required placeholder="Ex: GLPI" />
+        </label>
 
-  if (!title) throw new Error("Título é obrigatório");
-  if (!url) throw new Error("URL é obrigatória");
+        <label class="field">
+          <span>Categoria</span>
+          <input name="category" placeholder="Ex: Monitoramento" />
+        </label>
 
-  return { title, category, url, image, description };
-}
+        <label class="field">
+          <span>URL</span>
+          <input name="url" required placeholder="https://..." />
+        </label>
 
-function isAuthorized(req) {
-  const headerPass = String(req.headers["x-admin-password"] || "").trim();
+        <label class="field">
+          <span>Descrição (opcional)</span>
+          <textarea name="description" rows="3" placeholder="Opcional"></textarea>
+        </label>
 
-  const auth = String(req.headers["authorization"] || "").trim();
-  const bearer = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+        <footer class="modal__footer">
+          <button type="button" class="btn btn--danger" id="deleteBtn">Excluir</button>
+          <div class="spacer"></div>
+          <button type="button" class="btn" data-close="1">Cancelar</button>
+          <button type="submit" class="btn btn--primary">Salvar</button>
+        </footer>
+      </form>
+    </div>
+  </div>
 
-  const pass = headerPass || bearer;
-  return pass && pass === ADMIN_PASSWORD;
-}
+  <!-- Modal senha -->
+  <div id="pass-modal" class="modal" aria-hidden="true">
+    <div class="modal__backdrop" data-close="1"></div>
 
-function requireAuth(req, res, next) {
-  if (!isAuthorized(req)) {
-    return res.status(401).json({ error: "Senha inválida ou não informada." });
-  }
-  next();
-}
+    <div class="modal__panel" role="dialog" aria-modal="true" aria-label="Senha admin">
+      <header class="modal__header">
+        <h2 class="modal__title">Senha admin</h2>
+        <button class="icon-btn" data-close="1" aria-label="Fechar">✕</button>
+      </header>
 
-// ---------- Upload (multer) ----------
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, UPLOAD_DIR),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname || "").toLowerCase() || "";
-    const safeExt = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"].includes(ext) ? ext : "";
-    const name = `img_${Date.now()}_${Math.random().toString(16).slice(2)}${safeExt}`;
-    cb(null, name);
-  },
-});
+      <form id="pass-form" class="modal__form">
+        <label class="field">
+          <span>Digite a senha</span>
+          <input name="password" type="password" placeholder="••••••••" autocomplete="current-password" />
+        </label>
 
-const upload = multer({
-  storage,
-  limits: { fileSize: 3 * 1024 * 1024 }, // 3MB
-  fileFilter: (req, file, cb) => {
-    const ok = [
-      "image/png",
-      "image/jpeg",
-      "image/gif",
-      "image/webp",
-      "image/svg+xml",
-    ].includes(file.mimetype);
-    if (!ok) return cb(new Error("Tipo de arquivo inválido. Envie PNG/JPG/GIF/WEBP/SVG."));
-    cb(null, true);
-  },
-});
+        <footer class="modal__footer">
+          <button type="button" class="btn" data-close="1" id="passCancel">Cancelar</button>
+          <button type="submit" class="btn btn--primary">Confirmar</button>
+        </footer>
 
-// ---------- API ----------
-app.get("/api/health", (req, res) => res.json({ ok: true }));
+        <p class="hint">A senha fica salva apenas nesta sessão do navegador.</p>
+      </form>
+    </div>
+  </div>
 
-app.get("/api/cards", (req, res) => res.json(readCards()));
-
-// ✅ Upload protegido (só pede senha quando tentar enviar)
-app.post("/api/upload", requireAuth, upload.single("file"), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: "Arquivo não enviado." });
-
-  // url pública
-  const url = `/uploads/${req.file.filename}`;
-  res.json({ url });
-});
-
-app.post("/api/cards", requireAuth, (req, res) => {
-  try {
-    const cards = readCards();
-    const card = normalizeCard(req.body);
-
-    const nextId = cards.reduce((max, c) => Math.max(max, Number(c.id) || 0), 0) + 1;
-
-    const created = {
-      id: nextId,
-      ...card,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    cards.push(created);
-    writeCards(cards);
-
-    res.status(201).json(created);
-  } catch (err) {
-    res.status(400).json({ error: err.message || "Erro ao criar card" });
-  }
-});
-
-app.put("/api/cards/:id", requireAuth, (req, res) => {
-  try {
-    const cards = readCards();
-    const id = Number(req.params.id);
-    const idx = cards.findIndex((c) => Number(c.id) === id);
-    if (idx === -1) return res.status(404).json({ error: "Card não encontrado" });
-
-    const patch = normalizeCard(req.body);
-    const updated = { ...cards[idx], ...patch, updatedAt: new Date().toISOString() };
-
-    cards[idx] = updated;
-    writeCards(cards);
-
-    res.json(updated);
-  } catch (err) {
-    res.status(400).json({ error: err.message || "Erro ao atualizar card" });
-  }
-});
-
-app.delete("/api/cards/:id", requireAuth, (req, res) => {
-  const cards = readCards();
-  const id = Number(req.params.id);
-
-  const filtered = cards.filter((c) => Number(c.id) !== id);
-  if (filtered.length === cards.length) return res.status(404).json({ error: "Card não encontrado" });
-
-  writeCards(filtered);
-  res.json({ ok: true });
-});
-
-// SPA fallback
-app.get("*", (req, res) => {
-  res.sendFile(path.join(PUBLIC_DIR, "index.html"));
-});
-
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`✅ MRB Portal em http://0.0.0.0:${PORT}`);
-});
+  <script src="/app.js?v=8088"></script>
+</body>
+</html>

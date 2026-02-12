@@ -3,7 +3,6 @@
   --card: #1f2a3c;
   --card2: #24324a;
   --text: #f2f4f8;
-  --muted: rgba(242,244,248,.70);
   --ring: rgba(70,140,255,.45);
 
   --radius: 18px;
@@ -50,8 +49,8 @@ body{
   min-height: 150px;
   display: grid;
   align-content: center;
-  transition: transform .12s ease, background .12s ease, box-shadow .12s ease, outline-color .12s ease;
   outline: 2px solid transparent;
+  transition: transform .12s ease, background .12s ease, box-shadow .12s ease, outline-color .12s ease;
 }
 .card:hover{ transform: translateY(-2px); background: var(--card2); box-shadow: 0 12px 35px rgba(0,0,0,.25); }
 .card:focus-visible{ outline-color: var(--ring); box-shadow: 0 0 0 4px rgba(70,140,255,.25), 0 12px 35px rgba(0,0,0,.25); }
@@ -146,7 +145,7 @@ body{
 
 .modal__footer{ display: flex; align-items: center; gap: 10px; padding-top: 6px; }
 
-/* ✅ Preview Upload */
+/* Preview Upload */
 .imageBox{
   display: grid;
   grid-template-columns: 160px 1fr;
@@ -169,12 +168,7 @@ body{
   place-items: center;
 }
 
-#imgPreview{
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  display: none;
-}
+#imgPreview{ width: 100%; height: 100%; object-fit: contain; display: none; }
 
 .imageBox__placeholder{
   color: rgba(255,255,255,.65);
@@ -183,10 +177,7 @@ body{
   padding: 10px;
 }
 
-.imageBox__controls{
-  display: grid;
-  gap: 10px;
-}
+.imageBox__controls{ display: grid; gap: 10px; }
 
 @media (max-width: 640px){
   .imageBox{ grid-template-columns: 1fr; }

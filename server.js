@@ -5,10 +5,13 @@ const multer = require("multer");
 
 const app = express();
 
-// ✅ padrão 3000 (Coolify costuma expor 3000)
-const PORT = Number(process.env.PORT || 3000);
+// ✅ PORTA 8088
+const PORT = Number(process.env.PORT || 8088);
+
+// 🔐 senha admin (defina no Coolify)
 const ADMIN_PASSWORD = String(process.env.ADMIN_PASSWORD || "1537");
 
+// ✅ estrutura do seu projeto
 const DATA_FILE = path.join(__dirname, "data", "data.json");
 const PUBLIC_DIR = path.join(__dirname, "public");
 const UPLOAD_DIR = path.join(PUBLIC_DIR, "uploads");
@@ -24,9 +27,13 @@ ensureDir(UPLOAD_DIR);
 app.use(express.static(PUBLIC_DIR));
 app.use("/uploads", express.static(UPLOAD_DIR));
 
+// ---------- Data helpers ----------
 function ensureDataFile() {
-  if (!fs.existsSync(DATA_FILE)) fs.writeFileSync(DATA_FILE, JSON.stringify([], null, 2), "utf-8");
+  if (!fs.existsSync(DATA_FILE)) {
+    fs.writeFileSync(DATA_FILE, JSON.stringify([], null, 2), "utf-8");
+  }
 }
+
 function readCards() {
   ensureDataFile();
   const raw = fs.readFileSync(DATA_FILE, "utf-8").trim();
@@ -38,20 +45,26 @@ function readCards() {
     return [];
   }
 }
+
 function writeCards(cards) {
   ensureDataFile();
   fs.writeFileSync(DATA_FILE, JSON.stringify(cards, null, 2), "utf-8");
 }
+
 function normalizeCard(input) {
   const title = String(input.title ?? "").trim();
   const category = String(input.category ?? "").trim();
   const url = String(input.url ?? "").trim();
   const image = String(input.image ?? "").trim();
   const description = String(input.description ?? "").trim();
+
   if (!title) throw new Error("Título é obrigatório");
   if (!url) throw new Error("URL é obrigatória");
+
   return { title, category, url, image, description };
 }
+
+// ---------- Auth ----------
 function isAuthorized(req) {
   const headerPass = String(req.headers["x-admin-password"] || "").trim();
   const auth = String(req.headers["authorization"] || "").trim();
@@ -59,11 +72,13 @@ function isAuthorized(req) {
   const pass = headerPass || bearer;
   return pass && pass === ADMIN_PASSWORD;
 }
+
 function requireAuth(req, res, next) {
   if (!isAuthorized(req)) return res.status(401).json({ error: "Senha inválida ou não informada." });
   next();
 }
 
+// ---------- Upload (multer) ----------
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOAD_DIR),
   filename: (req, file, cb) => {
@@ -72,62 +87,89 @@ const storage = multer.diskStorage({
     cb(null, `img_${Date.now()}_${Math.random().toString(16).slice(2)}${safeExt}`);
   },
 });
+
 const upload = multer({
   storage,
-  limits: { fileSize: 3 * 1024 * 1024 },
+  limits: { fileSize: 3 * 1024 * 1024 }, // 3MB
   fileFilter: (req, file, cb) => {
-    const ok = ["image/png","image/jpeg","image/gif","image/webp","image/svg+xml"].includes(file.mimetype);
+    const ok = ["image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml"].includes(file.mimetype);
     if (!ok) return cb(new Error("Tipo inválido. Envie PNG/JPG/GIF/WEBP/SVG."));
     cb(null, true);
   },
 });
 
+// ---------- API ----------
 app.get("/api/health", (req, res) => res.json({ ok: true }));
 app.get("/api/cards", (req, res) => res.json(readCards()));
 
+// ✅ upload protegido
 app.post("/api/upload", requireAuth, upload.single("file"), (req, res) => {
   if (!req.file) return res.status(400).json({ error: "Arquivo não enviado." });
   res.json({ url: `/uploads/${req.file.filename}` });
 });
 
+// ✅ criar
 app.post("/api/cards", requireAuth, (req, res) => {
   try {
     const cards = readCards();
     const card = normalizeCard(req.body);
+
     const nextId = cards.reduce((max, c) => Math.max(max, Number(c.id) || 0), 0) + 1;
-    const created = { id: nextId, ...card, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+
+    const created = {
+      id: nextId,
+      ...card,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
     cards.push(created);
     writeCards(cards);
+
     res.status(201).json(created);
   } catch (err) {
     res.status(400).json({ error: err.message || "Erro ao criar card" });
   }
 });
 
+// ✅ editar
 app.put("/api/cards/:id", requireAuth, (req, res) => {
   try {
     const cards = readCards();
     const id = Number(req.params.id);
+
     const idx = cards.findIndex((c) => Number(c.id) === id);
     if (idx === -1) return res.status(404).json({ error: "Card não encontrado" });
+
     const patch = normalizeCard(req.body);
-    cards[idx] = { ...cards[idx], ...patch, updatedAt: new Date().toISOString() };
+    const updated = { ...cards[idx], ...patch, updatedAt: new Date().toISOString() };
+
+    cards[idx] = updated;
     writeCards(cards);
-    res.json(cards[idx]);
+
+    res.json(updated);
   } catch (err) {
     res.status(400).json({ error: err.message || "Erro ao atualizar card" });
   }
 });
 
+// ✅ excluir
 app.delete("/api/cards/:id", requireAuth, (req, res) => {
   const cards = readCards();
   const id = Number(req.params.id);
+
   const filtered = cards.filter((c) => Number(c.id) !== id);
   if (filtered.length === cards.length) return res.status(404).json({ error: "Card não encontrado" });
+
   writeCards(filtered);
   res.json({ ok: true });
 });
 
-app.get("*", (req, res) => res.sendFile(path.join(PUBLIC_DIR, "index.html")));
+// SPA fallback
+app.get("*", (req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, "index.html"));
+});
 
-app.listen(PORT, "0.0.0.0", () => console.log(`✅ MRB Portal em http://0.0.0.0:${PORT}`));
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`✅ MRB Portal em http://0.0.0.0:${PORT}`);
+});
