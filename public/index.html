@@ -1,23 +1,113 @@
-<!DOCTYPE html>
-<html>
+<!-- public/index.html -->
+<!doctype html>
+<html lang="pt-br">
 <head>
-  <title>Portal MRB</title>
-  <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MRB Portal</title>
+  <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
+  <main class="page">
+    <div class="container">
+      <header class="topbar">
+        <div class="topbar__left">
+          <h1 class="title">MRB Portal</h1>
+          <p class="subtitle">
+            Clique no card para abrir. Para editar/adicionar/excluir precisa senha.
+          </p>
+        </div>
 
-<header>
-  <h1>Portal MRB</h1>
+        <div class="topbar__right">
+          <input id="search" class="search" placeholder="Buscar..." />
+          <button id="adminBtn" class="btn btn--ghost" type="button">Senha admin</button>
+        </div>
+      </header>
 
-  <div class="controls">
-    <input type="text" id="search" placeholder="Buscar...">
-    <select id="categoryFilter"></select>
-    <button onclick="toggleTheme()">🌙</button>
+      <section id="cards-grid" class="cards-grid" aria-label="Cards"></section>
+
+      <div class="footer">
+        <span id="status" class="status"></span>
+      </div>
+    </div>
+  </main>
+
+  <!-- Modal (criar/editar) -->
+  <div id="card-modal" class="modal" aria-hidden="true">
+    <div class="modal__backdrop" data-close="1"></div>
+
+    <div class="modal__panel" role="dialog" aria-modal="true" aria-label="Editar card">
+      <header class="modal__header">
+        <h2 id="modal-title" class="modal__title">Editar card</h2>
+        <button class="icon-btn" data-close="1" aria-label="Fechar">✕</button>
+      </header>
+
+      <form id="card-form" class="modal__form">
+        <input type="hidden" name="id" />
+
+        <label class="field">
+          <span>Título</span>
+          <input name="title" required placeholder="Ex: GLPI" />
+        </label>
+
+        <label class="field">
+          <span>Categoria</span>
+          <input name="category" placeholder="Ex: Monitoramento" />
+        </label>
+
+        <label class="field">
+          <span>URL</span>
+          <input name="url" required placeholder="https://..." />
+        </label>
+
+        <label class="field">
+          <span>Imagem (URL)</span>
+          <input name="image" placeholder="https://...png" />
+        </label>
+
+        <label class="field">
+          <span>Descrição (opcional)</span>
+          <textarea name="description" rows="3" placeholder="Opcional"></textarea>
+        </label>
+
+        <footer class="modal__footer">
+          <button type="button" class="btn btn--danger" id="deleteBtn">Excluir</button>
+          <div class="spacer"></div>
+          <button type="button" class="btn" data-close="1">Cancelar</button>
+          <button type="submit" class="btn btn--primary">Salvar</button>
+        </footer>
+      </form>
+    </div>
   </div>
-</header>
 
-<div id="cards"></div>
+  <!-- Modal senha -->
+  <div id="pass-modal" class="modal" aria-hidden="true">
+    <div class="modal__backdrop" data-close="1"></div>
 
-<script src="app.js"></script>
+    <div class="modal__panel" role="dialog" aria-modal="true" aria-label="Senha admin">
+      <header class="modal__header">
+        <h2 class="modal__title">Senha admin</h2>
+        <button class="icon-btn" data-close="1" aria-label="Fechar">✕</button>
+      </header>
+
+      <form id="pass-form" class="modal__form">
+        <label class="field">
+          <span>Digite a senha</span>
+          <input name="password" type="password" placeholder="••••••••" autocomplete="current-password" />
+        </label>
+
+        <footer class="modal__footer">
+          <button type="button" class="btn" data-close="1">Cancelar</button>
+          <button type="submit" class="btn btn--primary">Salvar senha</button>
+        </footer>
+
+        <p class="hint">
+          A senha fica salva apenas no seu navegador (session). Para trocar no servidor, altere <b>ADMIN_PASSWORD</b> no Coolify.
+        </p>
+      </form>
+    </div>
+  </div>
+
+  <script src="./app.js"></script>
 </body>
 </html>

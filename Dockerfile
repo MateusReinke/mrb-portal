@@ -1,12 +1,14 @@
-FROM node:18
+# Dockerfile
+# ✅ Garantindo que o container expõe 8088
+FROM node:20-alpine
 
 WORKDIR /app
-
 COPY package*.json ./
-RUN npm install
+RUN npm ci --omit=dev
 
 COPY . .
 
+ENV PORT=8088
 EXPOSE 8088
 
-CMD ["node", "server.js"]
+CMD ["npm","start"]

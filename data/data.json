@@ -1,3 +1,63 @@
-{
-  "content": "Bem-vindo ao Portal MRB 🚀"
-}
+// data.json
+[
+  {
+    "id": 1,
+    "title": "n8n",
+    "category": "Automações",
+    "url": "https://n8n.mrbautomacoes.site",
+    "image": "https://registry.npmmirror.com/@lobehub/icons-static-png/latest/files/dark/n8n-color.png",
+    "description": "",
+    "createdAt": "2026-02-12T00:00:00.000Z",
+    "updatedAt": "2026-02-12T00:00:00.000Z"
+  },
+  {
+    "id": 2,
+    "title": "Zabbix",
+    "category": "Monitoramento",
+    "url": "https://zabbix.mrbautomacoes.site",
+    "image": "https://images.icon-icons.com/2699/PNG/512/zabbix_logo_icon_168734.png",
+    "description": "",
+    "createdAt": "2026-02-12T00:00:00.000Z",
+    "updatedAt": "2026-02-12T00:00:00.000Z"
+  },
+  {
+    "id": 3,
+    "title": "GLPI",
+    "category": "Service Desk",
+    "url": "https://glpi.mrbautomacoes.site",
+    "image": "https://helpdesk.project.inf.br/pics/logos/logo-GLPI-500-white.png",
+    "description": "",
+    "createdAt": "2026-02-12T00:00:00.000Z",
+    "updatedAt": "2026-02-12T00:00:00.000Z"
+  },
+  {
+    "id": 4,
+    "title": "Evolution",
+    "category": "WhatsApp API",
+    "url": "https://evolution.mrbautomacoes.site",
+    "image": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/evolution-api.png",
+    "description": "",
+    "createdAt": "2026-02-12T00:00:00.000Z",
+    "updatedAt": "2026-02-12T00:00:00.000Z"
+  },
+  {
+    "id": 5,
+    "title": "Chatwoot",
+    "category": "Atendimento",
+    "url": "https://chatwoot.mrbautomacoes.site",
+    "image": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/chatwoot.png",
+    "description": "",
+    "createdAt": "2026-02-12T00:00:00.000Z",
+    "updatedAt": "2026-02-12T00:00:00.000Z"
+  },
+  {
+    "id": 6,
+    "title": "Coolify",
+    "category": "Plataforma",
+    "url": "https://coolify.mrbautomacoes.site",
+    "image": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/coolify.png",
+    "description": "",
+    "createdAt": "2026-02-12T00:00:00.000Z",
+    "updatedAt": "2026-02-12T00:00:00.000Z"
+  }
+]

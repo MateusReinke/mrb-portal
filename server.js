@@ -1,98 +1,152 @@
-const express = require('express');
-const fs = require('fs-extra');
-const path = require('path');
-const jwt = require('jsonwebtoken');
+// server.js
+// ✅ Porta fixa 8088 (com fallback para PORT se você definir)
+// Se você quer GARANTIR 8088 sempre, deixe PORT=8088 no Coolify
+// ou troque a linha PORT para const PORT = 8088;
+
+const express = require("express");
+const path = require("path");
+const fs = require("fs");
 
 const app = express();
-app.use(express.json());
-app.use(express.static('public'));
 
-const PORT = 8088;
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin123";
-const JWT_SECRET = process.env.JWT_SECRET || "mrb_super_secret";
+// ✅ GARANTIA: se não existir PORT, usa 8088
+const PORT = Number(process.env.PORT || 8088);
 
-const dataFile = path.join(__dirname, 'data', 'data.json');
-fs.ensureFileSync(dataFile);
+const ADMIN_PASSWORD = String(process.env.ADMIN_PASSWORD || "1234567");
 
-// Se estiver vazio, cria dados padrão
-if (!fs.readFileSync(dataFile).toString()) {
-  fs.writeJsonSync(dataFile, [
-    {
-      id: 1,
-      title: "n8n",
-      category: "Automações",
-      url: "https://n8n.mrbautomacoes.site",
-      image: "https://registry.npmmirror.com/@lobehub/icons-static-png/latest/files/dark/n8n-color.png"
-    },
-    {
-      id: 2,
-      title: "Zabbix",
-      category: "Monitoramento",
-      url: "https://zabbix.mrbautomacoes.site",
-      image: "https://images.icon-icons.com/2699/PNG/512/zabbix_logo_icon_168734.png"
-    },
-    {
-      id: 3,
-      title: "GLPI",
-      category: "Service Desk",
-      url: "https://glpi.mrbautomacoes.site",
-      image: "https://helpdesk.project.inf.br/pics/logos/logo-GLPI-500-white.png"
-    },
-    {
-      id: 4,
-      title: "Evolution",
-      category: "WhatsApp API",
-      url: "https://evolution.mrbautomacoes.site",
-      image: "URL_IMAGEM_VALIDA_AQUI"
-    },
-    {
-      id: 5,
-      title: "Chatwoot",
-      category: "Atendimento",
-      url: "https://chatwoot.mrbautomacoes.site",
-      image: "URL_IMAGEM_VALIDA_AQUI"
-    },
-    {
-      id: 6,
-      title: "Coolify",
-      category: "Plataforma",
-      url: "https://coolify.mrbautomacoes.site",
-      image: "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/coolify.png"
-    }
-  ], { spaces: 2 });
-}
+const DATA_FILE = path.join(__dirname, "data.json");
 
-function auth(req, res, next){
-  const token = req.headers.authorization;
-  if(!token) return res.status(401).json({error:"Token ausente"});
-  try{
-    jwt.verify(token, JWT_SECRET);
-    next();
-  }catch{
-    res.status(401).json({error:"Token inválido"});
+app.use(express.json({ limit: "2mb" }));
+app.use(express.static(path.join(__dirname, "public")));
+
+// ---------- Helpers ----------
+function ensureDataFile() {
+  if (!fs.existsSync(DATA_FILE)) {
+    fs.writeFileSync(DATA_FILE, JSON.stringify([], null, 2), "utf-8");
   }
 }
 
-app.post('/login', (req,res)=>{
-  if(req.body.password !== ADMIN_PASSWORD)
-    return res.status(401).json({error:"Senha incorreta"});
-  const token = jwt.sign({admin:true}, JWT_SECRET, {expiresIn:"8h"});
-  res.json({token});
+function readCards() {
+  ensureDataFile();
+  const raw = fs.readFileSync(DATA_FILE, "utf-8").trim();
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeCards(cards) {
+  fs.writeFileSync(DATA_FILE, JSON.stringify(cards, null, 2), "utf-8");
+}
+
+function normalizeCard(input) {
+  const title = String(input.title ?? "").trim();
+  const category = String(input.category ?? "").trim();
+  const url = String(input.url ?? "").trim();
+  const image = String(input.image ?? "").trim();
+  const description = String(input.description ?? "").trim();
+
+  if (!title) throw new Error("Título é obrigatório");
+  if (!url) throw new Error("URL é obrigatória");
+
+  return { title, category, url, image, description };
+}
+
+function isAuthorized(req) {
+  const headerPass = String(req.headers["x-admin-password"] || "").trim();
+
+  const auth = String(req.headers["authorization"] || "").trim();
+  const bearer = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+
+  const pass = headerPass || bearer;
+  return pass && pass === ADMIN_PASSWORD;
+}
+
+function requireAuth(req, res, next) {
+  if (!isAuthorized(req)) {
+    return res.status(401).json({ error: "Senha inválida ou não informada." });
+  }
+  next();
+}
+
+// ---------- API ----------
+app.get("/api/health", (req, res) => {
+  res.json({ ok: true });
 });
 
-app.get('/cards', async(req,res)=>{
-  const data = await fs.readJson(dataFile);
-  res.json(data);
+app.get("/api/cards", (req, res) => {
+  res.json(readCards());
 });
 
-app.post('/cards', auth, async(req,res)=>{
-  await fs.writeJson(dataFile, req.body, {spaces:2});
-  res.json({success:true});
-});
-// ROTA ADMIN INVISÍVEL
-app.get('/portal-mrb-admin-8472.html', (req,res)=>{
-  res.sendFile(path.join(__dirname,'public','portal-mrb-admin-8472.html'));
+app.post("/api/cards", requireAuth, (req, res) => {
+  try {
+    const cards = readCards();
+    const card = normalizeCard(req.body);
+
+    const nextId = cards.reduce((max, c) => Math.max(max, Number(c.id) || 0), 0) + 1;
+
+    const created = {
+      id: nextId,
+      ...card,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    cards.push(created);
+    writeCards(cards);
+
+    res.status(201).json(created);
+  } catch (err) {
+    res.status(400).json({ error: err.message || "Erro ao criar card" });
+  }
 });
 
-// START SERVER
-app.listen(PORT, ()=> console.log("Rodando na porta "+PORT));
+app.put("/api/cards/:id", requireAuth, (req, res) => {
+  try {
+    const cards = readCards();
+    const id = Number(req.params.id);
+    const idx = cards.findIndex((c) => Number(c.id) === id);
+    if (idx === -1) return res.status(404).json({ error: "Card não encontrado" });
+
+    const patch = normalizeCard(req.body);
+
+    const updated = {
+      ...cards[idx],
+      ...patch,
+      updatedAt: new Date().toISOString(),
+    };
+
+    cards[idx] = updated;
+    writeCards(cards);
+
+    res.json(updated);
+  } catch (err) {
+    res.status(400).json({ error: err.message || "Erro ao atualizar card" });
+  }
+});
+
+app.delete("/api/cards/:id", requireAuth, (req, res) => {
+  const cards = readCards();
+  const id = Number(req.params.id);
+
+  const filtered = cards.filter((c) => Number(c.id) !== id);
+  if (filtered.length === cards.length) {
+    return res.status(404).json({ error: "Card não encontrado" });
+  }
+
+  writeCards(filtered);
+  res.json({ ok: true });
+});
+
+// Fallback SPA
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`✅ MRB Portal rodando em http://0.0.0.0:${PORT}`);
+  console.log(`🔐 ADMIN_PASSWORD=${ADMIN_PASSWORD ? "definida" : "não definida"}`);
+});
