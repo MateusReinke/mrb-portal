@@ -342,21 +342,39 @@ body{
   .imageBox{ grid-template-columns: 1fr; }
   .imageBox__preview{ width:100%; height: 170px; }
 }
-/* ✅ Logo no topo: sem círculo/bolha (só a imagem) */
+/* ✅ LOGO DO TOPO: somente a imagem (zera qualquer bolha/círculo) */
 .hero__badge.hero__badge--logo{
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
   backdrop-filter: none !important;
+  filter: none !important;
 
   padding: 0 !important;
+  margin: 0 0 10px 0 !important;
+
   border-radius: 0 !important;
+  outline: none !important;
+
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
-/* se quiser a logo um pouco maior/mais nítida */
+/* mata qualquer “círculo” criado por pseudo-elementos */
+.hero__badge.hero__badge--logo::before,
+.hero__badge.hero__badge--logo::after{
+  content: none !important;
+  display: none !important;
+}
+
 .hero__logo{
-  height: 150px;   /* ajuste: 48-90px */
+  height: 150px;     /* ajuste como quiser */
   width: auto;
   display: block;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
   filter: none !important;
 }
