@@ -1,0 +1,12 @@
+version: '3'
+
+services:
+  mrb-portal:
+    build: .
+    ports:
+      - "8088:8088"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - ADMIN_PASSWORD=admin123
+      - JWT_SECRET=mrb_super_secret

@@ -1,0 +1,29 @@
+body {
+  font-family: Arial;
+  background: #111;
+  color: white;
+  text-align: center;
+}
+
+#cards {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 20px;
+}
+
+.card {
+  background: #1c1c1c;
+  padding: 20px;
+  border-radius: 12px;
+  width: 200px;
+}
+
+.card img {
+  width: 80px;
+}
+
+.card a {
+  color: white;
+  text-decoration: none;
+}
