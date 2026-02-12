@@ -5,12 +5,26 @@ const multer = require("multer");
 
 const app = express();
 
-// ✅ Coolify normalmente seta PORT automaticamente.
-// ✅ Mantemos fallback 8088 só se PORT não existir.
+// ✅ Porta
 const PORT = Number(process.env.PORT ?? 8088);
 
+// ✅ Normaliza env (remove espaços e aspas acidentais)
+function normalizeSecret(value, fallback) {
+  let v = (value ?? fallback ?? "").toString();
+
+  // remove whitespace em volta
+  v = v.trim();
+
+  // remove aspas envolvendo o valor (caso você tenha colocado "1234" no Coolify)
+  if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+    v = v.slice(1, -1).trim();
+  }
+
+  return v;
+}
+
 // 🔐 senha admin (defina no Coolify)
-const ADMIN_PASSWORD = String(process.env.ADMIN_PASSWORD || "1537");
+const ADMIN_PASSWORD = normalizeSecret(process.env.ADMIN_PASSWORD, "1537");
 
 // ✅ estrutura do seu projeto
 const DATA_FILE = path.join(__dirname, "data", "data.json");
@@ -66,18 +80,45 @@ function normalizeCard(input) {
 }
 
 // ---------- Auth ----------
-function isAuthorized(req) {
+function getProvidedPassword(req) {
   const headerPass = String(req.headers["x-admin-password"] || "").trim();
+
   const auth = String(req.headers["authorization"] || "").trim();
   const bearer = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
-  const pass = headerPass || bearer;
-  return pass && pass === ADMIN_PASSWORD;
+
+  return headerPass || bearer;
+}
+
+function isAuthorized(req) {
+  const pass = getProvidedPassword(req);
+  return !!pass && pass === ADMIN_PASSWORD;
 }
 
 function requireAuth(req, res, next) {
-  if (!isAuthorized(req)) return res.status(401).json({ error: "Senha inválida ou não informada." });
+  if (!isAuthorized(req)) {
+    return res.status(401).json({
+      error: "Senha inválida ou não informada.",
+      // ✅ Ajuda no diagnóstico SEM revelar a senha
+      debug: {
+        env_has_admin_password: !!process.env.ADMIN_PASSWORD,
+        env_admin_password_length: ADMIN_PASSWORD.length,
+        provided_password_length: getProvidedPassword(req).length,
+      },
+    });
+  }
   next();
 }
+
+// ✅ Endpoint de diagnóstico (não revela senha)
+app.post("/api/auth-check", (req, res) => {
+  const ok = isAuthorized(req);
+  res.json({
+    ok,
+    env_has_admin_password: !!process.env.ADMIN_PASSWORD,
+    env_admin_password_length: ADMIN_PASSWORD.length,
+    provided_password_length: getProvidedPassword(req).length,
+  });
+});
 
 // ---------- Upload (multer) ----------
 const storage = multer.diskStorage({
@@ -91,7 +132,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 3 * 1024 * 1024 }, // 3MB
+  limits: { fileSize: 3 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const ok = ["image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml"].includes(file.mimetype);
     if (!ok) return cb(new Error("Tipo inválido. Envie PNG/JPG/GIF/WEBP/SVG."));
@@ -112,7 +153,6 @@ app.post("/api/cards", requireAuth, (req, res) => {
   try {
     const cards = readCards();
     const card = normalizeCard(req.body);
-
     const nextId = cards.reduce((max, c) => Math.max(max, Number(c.id) || 0), 0) + 1;
 
     const created = {
@@ -169,6 +209,7 @@ app.get("*", (req, res) => {
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log("✅ MRB Portal iniciado");
-  console.log("ENV PORT =", process.env.PORT);
   console.log("LISTENING PORT =", PORT);
+  console.log("ENV ADMIN_PASSWORD exists? ", !!process.env.ADMIN_PASSWORD);
+  console.log("ADMIN_PASSWORD length =", ADMIN_PASSWORD.length);
 });
