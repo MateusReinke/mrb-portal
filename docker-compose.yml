@@ -1,12 +1,18 @@
-version: '3'
+version: "3.8"
 
 services:
   mrb-portal:
     build: .
+    environment:
+      PORT: "8088"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-1537}"
     ports:
       - "8088:8088"
     volumes:
-      - ./data:/app/data
-    environment:
-      - ADMIN_PASSWORD=admin123
-      - JWT_SECRET=mrb_super_secret
+      - mrb_portal_data:/app/data
+      - mrb_portal_uploads:/app/public/uploads
+    restart: unless-stopped
+
+volumes:
+  mrb_portal_data:
+  mrb_portal_uploads:
