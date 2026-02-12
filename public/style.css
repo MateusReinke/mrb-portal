@@ -355,7 +355,7 @@ body{
 
 /* se quiser a logo um pouco maior/mais nítida */
 .hero__logo{
-  height: 64px;   /* ajuste: 48-90px */
+  height: 150px;   /* ajuste: 48-90px */
   width: auto;
   display: block;
   filter: none !important;
