@@ -1,4 +1,8 @@
 // public/app.js (COMPLETO)
+// ✅ Render no estilo do print (ícone grande central, título + categoria)
+// ✅ Card todo clicável, botões não abrem link
+// ✅ + card tracejado
+// 🔐 CRUD pede senha (salva na sessionStorage)
 
 const grid = document.querySelector("#cards-grid");
 const statusEl = document.querySelector("#status");
@@ -86,7 +90,6 @@ function openCard(url) {
 function cardHtml(c) {
   const title = escapeHtml(c.title);
   const category = escapeHtml(c.category || "");
-  const desc = escapeHtml(c.description || "");
   const image = escapeHtml(c.image || "");
 
   const imgHtml = image
@@ -103,15 +106,10 @@ function cardHtml(c) {
         <button class="icon-btn" data-action="edit" aria-label="Editar">✏</button>
       </div>
 
-      <div class="card__body">
-        <div class="card__top">
-          ${imgHtml}
-          <h3 class="card__title">${title}</h3>
-        </div>
-
-        <p class="card__desc">${desc || " "}</p>
-
-        ${category ? `<div class="card__meta"><span class="pill">${category}</span></div>` : ""}
+      <div class="card__center">
+        ${imgHtml}
+        <h3 class="card__title">${title}</h3>
+        <p class="card__cat">${category || "&nbsp;"}</p>
       </div>
     </article>
   `;
@@ -119,18 +117,9 @@ function cardHtml(c) {
 
 function addCardHtml() {
   return `
-    <article class="card card--add" role="button" tabindex="0">
-      <div class="card__actions">
-        <button class="icon-btn" data-action="add" aria-label="Adicionar novo card">＋</button>
-      </div>
-
-      <div class="card__body">
-        <div class="card__top">
-          <div class="card__img" aria-hidden="true"></div>
-          <h3 class="card__title">Adicionar</h3>
-        </div>
-        <p class="card__desc">Crie um novo atalho/portal.</p>
-        <div class="card__meta"><span class="pill">Admin</span></div>
+    <article class="card card--add" role="button" tabindex="0" data-add="1">
+      <div class="card__center">
+        <div class="plus">+</div>
       </div>
     </article>
   `;
@@ -209,12 +198,12 @@ function openCreateModal() {
   openCardModal("create", null);
 }
 
-// Grid events
 grid.addEventListener("click", (e) => {
   const actionBtn = e.target.closest("[data-action]");
   const cardEl = e.target.closest(".card");
   if (!cardEl) return;
 
+  // botões do card
   if (actionBtn) {
     e.stopPropagation();
     const action = actionBtn.dataset.action;
@@ -222,17 +211,17 @@ grid.addEventListener("click", (e) => {
 
     if (action === "settings") return openSettings(id);
     if (action === "edit") return openEditModal(id);
-    if (action === "add") return openCreateModal();
     return;
   }
 
-  if (cardEl.classList.contains("card--add")) return openCreateModal();
+  // card + (add)
+  if (cardEl.dataset.add === "1") return openCreateModal();
 
+  // card normal
   const url = cardEl.dataset.url;
   if (url) openCard(url);
 });
 
-// keyboard
 grid.addEventListener("keydown", (e) => {
   if (e.key !== "Enter" && e.key !== " ") return;
   const cardEl = e.target.closest(".card");
@@ -240,12 +229,12 @@ grid.addEventListener("keydown", (e) => {
 
   e.preventDefault();
 
-  if (cardEl.classList.contains("card--add")) return openCreateModal();
+  if (cardEl.dataset.add === "1") return openCreateModal();
+
   const url = cardEl.dataset.url;
   if (url) openCard(url);
 });
 
-// close modals
 document.addEventListener("click", (e) => {
   if (e.target.closest("#card-modal [data-close]")) closeCardModal();
   if (e.target.closest("#pass-modal [data-close]")) closePassModal();
@@ -258,6 +247,7 @@ document.addEventListener("keydown", (e) => {
 });
 
 adminBtn.addEventListener("click", () => openPassModal());
+searchEl.addEventListener("input", applyFilter);
 
 passForm.addEventListener("submit", (e) => {
   e.preventDefault();
@@ -314,7 +304,5 @@ deleteBtn.addEventListener("click", async () => {
     alert(err.message);
   }
 });
-
-searchEl.addEventListener("input", applyFilter);
 
 load();

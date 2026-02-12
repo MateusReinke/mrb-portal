@@ -1,37 +1,30 @@
-<!-- public/index.html (COMPLETO)
-✅ usa /style.css e /app.js (seus nomes reais)
--->
+<!-- public/index.html (COMPLETO) -->
 <!doctype html>
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MRB Portal</title>
-
-  <!-- ✅ NOME CERTO -->
-  <link rel="stylesheet" href="/style.css?v=1" />
+  <title>Portal MRB Automações</title>
+  <link rel="stylesheet" href="/style.css?v=2" />
 </head>
 <body>
   <main class="page">
-    <div class="container">
-      <header class="topbar">
-        <div class="topbar__left">
-          <h1 class="title">MRB Portal</h1>
-          <p class="subtitle">Clique no card para abrir. Para editar/adicionar/excluir precisa senha.</p>
-        </div>
+    <header class="hero">
+      <h1 class="hero__title">Portal MRB Automações</h1>
+      <p class="hero__subtitle">Central de aplicações • Infraestrutura privada</p>
 
-        <div class="topbar__right">
-          <input id="search" class="search" placeholder="Buscar..." />
-          <button id="adminBtn" class="btn btn--ghost" type="button">Senha admin</button>
-        </div>
-      </header>
+      <div class="hero__controls">
+        <input id="search" class="search" placeholder="Buscar..." />
+        <button id="adminBtn" class="btn btn--ghost" type="button">Senha admin</button>
+      </div>
+    </header>
 
-      <section id="cards-grid" class="cards-grid" aria-label="Cards"></section>
-
+    <section class="wrap">
+      <section id="cards-grid" class="grid" aria-label="Cards"></section>
       <div class="footer">
         <span id="status" class="status"></span>
       </div>
-    </div>
+    </section>
   </main>
 
   <!-- Modal (criar/editar) -->
@@ -110,7 +103,6 @@
     </div>
   </div>
 
-  <!-- ✅ NOME CERTO -->
-  <script src="/app.js?v=1"></script>
+  <script src="/app.js?v=2"></script>
 </body>
 </html>
