@@ -36,6 +36,7 @@ function escapeHtml(str) {
     .replaceAll("'", "&#039;");
 }
 
+// preview
 function setPreviewFromUrl(url) {
   const clean = String(url || "").trim();
   if (!clean) {
@@ -55,14 +56,13 @@ imageFileEl.addEventListener("change", () => {
   setPreviewFromUrl(URL.createObjectURL(file));
 });
 
-// ---------- Confirm modal ----------
+// confirm modal
 function openConfirmModal({ title, text }) {
   confirmTitle.textContent = title || "Confirmar";
   confirmText.textContent = text || "Digite a senha para confirmar.";
   confirmPass.value = "";
   confirmModal.setAttribute("aria-hidden", "false");
   setTimeout(() => confirmPass.focus(), 30);
-
   return new Promise((resolve) => { confirmResolver = resolve; });
 }
 function closeConfirmModal() { confirmModal.setAttribute("aria-hidden", "true"); }
@@ -85,7 +85,7 @@ confirmCancel.addEventListener("click", (e) => {
   resolveConfirm({ ok: false, pass: "" });
 });
 
-// ---------- Card modal ----------
+// card modal
 function openCardModal(mode, card) {
   currentMode = mode;
   currentId = card?.id || null;
@@ -114,16 +114,18 @@ function openCardModal(mode, card) {
   imageUrlEl.value = card.image ?? "";
   setPreviewFromUrl(card.image ?? "");
 }
+
 function closeCardModal() {
   cardModal.setAttribute("aria-hidden", "true");
   currentId = null;
 }
+
 function openCard(url) {
   if (!url) return;
   window.open(url, "_blank", "noopener,noreferrer");
 }
 
-// ---------- Render ----------
+// render
 function cardHtml(c) {
   const title = escapeHtml(c.title);
   const category = escapeHtml(c.category || "");
@@ -159,17 +161,11 @@ function render(cards) {
   grid.insertAdjacentHTML("beforeend", addCardHtml());
 }
 
-// ---------- API ----------
-async function api(path, opts = {}) {
-  const headers = { ...(opts.headers || {}) };
-  const method = String(opts.method || "GET").toUpperCase();
-
-  if (!(opts.body instanceof FormData)) headers["Content-Type"] = "application/json";
-
-  const res = await fetch(path, { ...opts, headers });
+// api helper
+async function api(url, opts = {}) {
+  const res = await fetch(url, opts);
   const isJson = (res.headers.get("content-type") || "").includes("application/json");
   const body = isJson ? await res.json() : await res.text();
-
   if (!res.ok) throw new Error(body?.error || `Erro HTTP ${res.status}`);
   return body;
 }
@@ -185,6 +181,7 @@ async function load() {
     setStatus(`Erro: ${e.message}`);
   }
 }
+
 function applyFilter() {
   const q = (searchEl.value || "").trim().toLowerCase();
   if (!q) return render(allCards);
@@ -195,15 +192,18 @@ function applyFilter() {
   });
   render(filtered);
 }
+
 searchEl.addEventListener("input", applyFilter);
 
-// ---------- Actions ----------
+// grid click
 function openEditModal(id) {
   const card = allCards.find((c) => String(c.id) === String(id));
   if (!card) return;
   openCardModal("edit", card);
 }
-function openCreateModal() { openCardModal("create", null); }
+function openCreateModal() {
+  openCardModal("create", null);
+}
 
 grid.addEventListener("click", (e) => {
   const actionBtn = e.target.closest("[data-action]");
@@ -212,11 +212,11 @@ grid.addEventListener("click", (e) => {
 
   if (actionBtn) {
     e.stopPropagation();
-    const id = cardEl.dataset.id;
-    return openEditModal(id);
+    return openEditModal(cardEl.dataset.id);
   }
 
   if (cardEl.dataset.add === "1") return openCreateModal();
+
   const url = cardEl.dataset.url;
   if (url) openCard(url);
 });
@@ -229,7 +229,6 @@ document.addEventListener("click", (e) => {
     resolveConfirm({ ok: false, pass: "" });
   }
 });
-
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
   if (cardModal.getAttribute("aria-hidden") === "false") closeCardModal();
@@ -239,36 +238,22 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-// helper: cria headers com 2 formas
-function authHeaders(pass) {
-  const p = String(pass || "").trim();
-  return {
-    "x-admin-password": p,
-    "Authorization": `Bearer ${p}`,
-  };
-}
-
-// upload
+// upload helper (FormData com admin_password)
 async function uploadSelectedImageIfAny(password) {
   const file = imageFileEl.files?.[0];
   if (!file) return null;
 
   const fd = new FormData();
   fd.append("file", file);
+  fd.append("admin_password", password);
 
-  const result = await api("/api/upload", {
-    method: "POST",
-    body: fd,
-    headers: authHeaders(password),
-  });
-
+  const result = await api("/api/upload", { method: "POST", body: fd });
   return result.url;
 }
 
-// save (sempre pede senha)
+// save (senha sempre, cada vez)
 cardForm.addEventListener("submit", async (e) => {
   e.preventDefault();
-
   try {
     const conf = await openConfirmModal({
       title: "Confirmar alteração",
@@ -287,6 +272,7 @@ cardForm.addEventListener("submit", async (e) => {
     }
 
     const payload = {
+      admin_password: conf.pass, // ✅ vai no body
       title: cardForm.elements.title.value,
       category: cardForm.elements.category.value,
       url: cardForm.elements.url.value,
@@ -297,15 +283,15 @@ cardForm.addEventListener("submit", async (e) => {
     if (currentMode === "create") {
       await api("/api/cards", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
-        headers: authHeaders(conf.pass),
       });
     } else {
       const id = cardForm.elements.id.value;
       await api(`/api/cards/${encodeURIComponent(id)}`, {
         method: "PUT",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
-        headers: authHeaders(conf.pass),
       });
     }
 
@@ -316,7 +302,7 @@ cardForm.addEventListener("submit", async (e) => {
   }
 });
 
-// delete (sempre pede senha)
+// delete (senha sempre)
 deleteBtn.addEventListener("click", async () => {
   try {
     const id = currentId || cardForm.elements.id.value;
@@ -332,7 +318,8 @@ deleteBtn.addEventListener("click", async () => {
 
     await api(`/api/cards/${encodeURIComponent(id)}`, {
       method: "DELETE",
-      headers: authHeaders(conf.pass),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ admin_password: conf.pass }), // ✅ body
     });
 
     closeCardModal();
