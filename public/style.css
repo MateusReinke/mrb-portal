@@ -25,13 +25,13 @@ body{
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
   color: var(--text);
   background:
-    radial-gradient(1200px 600px at 20% -10%, rgba(124,58,237,.35), transparent 60%),
-    radial-gradient(1000px 600px at 80% 0%, rgba(6,182,212,.25), transparent 55%),
-    radial-gradient(900px 600px at 50% 110%, rgba(34,197,94,.18), transparent 60%),
+    radial-gradient(1200px 600px at 20% -10%, rgba(0, 119, 255, 0.35), transparent 60%),
+    radial-gradient(1000px 600px at 80% 0%, rgba(0, 217, 255, 0.322), transparent 55%),
+    radial-gradient(900px 600px at 50% 110%, rgba(7, 19, 11, 0.18), transparent 60%),
     linear-gradient(180deg, var(--bg0), var(--bg1));
 }
 
-.page{ min-height:100vh; padding: 44px 18px 64px; }
+.page{ min-height:100vh; padding: 1px 1px 1px; }
 
 .hero{
   max-width: var(--max);
@@ -351,7 +351,7 @@ body{
   filter: none !important;
 
   padding: 0 !important;
-  margin: 0 0 10px 0 !important;
+  margin: 0 0 0px 0 !important;
 
   border-radius: 0 !important;
   outline: none !important;
@@ -369,7 +369,7 @@ body{
 }
 
 .hero__logo{
-  height: 150px;     /* ajuste como quiser */
+  height: 200px;     /* ajuste como quiser */
   width: auto;
   display: block;
   background: transparent !important;
