@@ -2,33 +2,47 @@ const express = require("express");
 const path = require("path");
 const fs = require("fs");
 const multer = require("multer");
-const crypto = require("crypto");
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 8088);
 
-// normaliza secret removendo: aspas, espaços, tabs, newlines e chars invisíveis
 function normalizeSecret(value, fallback) {
   let v = (value ?? fallback ?? "").toString();
 
-  // remove BOM e zero-width chars comuns
+  // remove chars invisíveis
   v = v.replace(/\uFEFF/g, "");                 // BOM
   v = v.replace(/[\u200B-\u200D\u2060]/g, "");  // zero width
 
   v = v.trim();
 
-  // remove aspas envolvendo o valor
+  // remove aspas envolvendo
   if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
-    v = v.slice(1, -1);
+    v = v.slice(1, -1).trim();
   }
 
-  // remove todos espaços/tabs/newlines restantes (se você quiser permitir espaço na senha, remova esta linha)
-  v = v.replace(/\s+/g, "");
+  // remove quebras de linha e espaços “esquisitos”
+  v = v.replace(/\r?\n/g, "").trim();
 
   return v;
 }
 
-const ADMIN_PASSWORD = normalizeSecret(process.env.ADMIN_PASSWORD, "1537");
+// 🔐 senha do servidor via ENV (Coolify)
+const ADMIN_PASSWORD_ENV = normalizeSecret(process.env.ADMIN_PASSWORD, "");
+
+// ✅ senha de TESTE fixa (para funcionar agora)
+const ADMIN_PASSWORD_TEST = "1537";
+
+// ✅ regras: se tiver ENV, aceita ENV OU TESTE. Se não tiver ENV, aceita TESTE.
+function isValidPassword(pass) {
+  if (!pass) return false;
+  const p = normalizeSecret(pass, "");
+  if (!p) return false;
+
+  if (ADMIN_PASSWORD_ENV) {
+    return p === ADMIN_PASSWORD_ENV || p === ADMIN_PASSWORD_TEST;
+  }
+  return p === ADMIN_PASSWORD_TEST;
+}
 
 const DATA_FILE = path.join(__dirname, "data", "data.json");
 const PUBLIC_DIR = path.join(__dirname, "public");
@@ -77,48 +91,30 @@ function normalizeCard(input) {
   return { title, category, url, image, description };
 }
 
-// ---------- Auth helpers ----------
-function sha8(s) {
-  return crypto.createHash("sha256").update(String(s || ""), "utf8").digest("hex").slice(0, 10);
-}
-
+// ---------- Auth ----------
 function getPasswordFromHeaders(req) {
-  const headerPass = String(req.headers["x-admin-password"] || "");
-  const auth = String(req.headers["authorization"] || "");
-  const bearer = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7) : "";
-  return normalizeSecret(headerPass || bearer, "");
+  const headerPass = String(req.headers["x-admin-password"] || "").trim();
+  const auth = String(req.headers["authorization"] || "").trim();
+  const bearer = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+  return headerPass || bearer;
 }
-
 function getPasswordFromBody(req) {
-  const p = req?.body?.admin_password ?? req?.body?.password ?? "";
-  return normalizeSecret(p, "");
+  return req?.body?.admin_password ?? req?.body?.password ?? "";
 }
-
 function getProvidedPassword(req) {
   return getPasswordFromHeaders(req) || getPasswordFromBody(req);
 }
-
-function isAuthorized(req) {
-  const pass = getProvidedPassword(req);
-  return !!pass && pass === ADMIN_PASSWORD;
-}
-
 function requireAuth(req, res, next) {
-  if (!isAuthorized(req)) {
-    const provided = getProvidedPassword(req);
-
+  const provided = getProvidedPassword(req);
+  if (!isValidPassword(provided)) {
     return res.status(401).json({
       error: "Senha inválida ou não informada.",
       debug: {
         env_has_admin_password: !!process.env.ADMIN_PASSWORD,
-        env_admin_len: ADMIN_PASSWORD.length,
-        env_admin_hash8: sha8(ADMIN_PASSWORD),
-
+        env_admin_len: ADMIN_PASSWORD_ENV ? ADMIN_PASSWORD_ENV.length : 0,
         provided_from_header: !!getPasswordFromHeaders(req),
         provided_from_body: !!getPasswordFromBody(req),
-        provided_len: provided.length,
-        provided_hash8: sha8(provided),
-
+        provided_len: String(provided || "").length,
         body_keys: req.body ? Object.keys(req.body) : [],
         content_type: String(req.headers["content-type"] || ""),
       },
@@ -126,19 +122,6 @@ function requireAuth(req, res, next) {
   }
   next();
 }
-
-// ✅ endpoint pra testar senha e comparar hash (não vaza)
-app.post("/api/debug-auth-hash", (req, res) => {
-  const provided = getProvidedPassword(req);
-  return res.json({
-    ok: provided === ADMIN_PASSWORD,
-    env_has_admin_password: !!process.env.ADMIN_PASSWORD,
-    env_admin_len: ADMIN_PASSWORD.length,
-    env_admin_hash8: sha8(ADMIN_PASSWORD),
-    provided_len: provided.length,
-    provided_hash8: sha8(provided),
-  });
-});
 
 // ---------- Upload (multer) ----------
 const storage = multer.diskStorage({
@@ -164,22 +147,18 @@ const upload = multer({
 app.get("/api/health", (req, res) => res.json({ ok: true }));
 app.get("/api/cards", (req, res) => res.json(readCards()));
 
-// upload: multer primeiro, depois auth
+// upload: multer primeiro, depois valida senha
 app.post("/api/upload", upload.single("file"), (req, res) => {
-  if (!isAuthorized(req)) {
-    const provided = getProvidedPassword(req);
+  const provided = getProvidedPassword(req);
+  if (!isValidPassword(provided)) {
     return res.status(401).json({
       error: "Senha inválida ou não informada.",
       debug: {
         env_has_admin_password: !!process.env.ADMIN_PASSWORD,
-        env_admin_len: ADMIN_PASSWORD.length,
-        env_admin_hash8: sha8(ADMIN_PASSWORD),
-
+        env_admin_len: ADMIN_PASSWORD_ENV ? ADMIN_PASSWORD_ENV.length : 0,
         provided_from_header: !!getPasswordFromHeaders(req),
         provided_from_body: !!getPasswordFromBody(req),
-        provided_len: provided.length,
-        provided_hash8: sha8(provided),
-
+        provided_len: String(provided || "").length,
         body_keys: req.body ? Object.keys(req.body) : [],
         has_file: !!req.file,
         content_type: String(req.headers["content-type"] || ""),
@@ -253,7 +232,7 @@ app.get("*", (req, res) => {
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ MRB Portal em http://0.0.0.0:${PORT}`);
-  console.log("ENV ADMIN_PASSWORD exists?", !!process.env.ADMIN_PASSWORD);
-  console.log("ADMIN_PASSWORD len =", ADMIN_PASSWORD.length);
-  console.log("ADMIN_PASSWORD hash8 =", sha8(ADMIN_PASSWORD));
+  console.log("ADMIN_PASSWORD env exists?", !!process.env.ADMIN_PASSWORD);
+  console.log("ADMIN_PASSWORD env len:", ADMIN_PASSWORD_ENV ? ADMIN_PASSWORD_ENV.length : 0);
+  console.log("✅ TEST PASSWORD enabled:", ADMIN_PASSWORD_TEST);
 });
